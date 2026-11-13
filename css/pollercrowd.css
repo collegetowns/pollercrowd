@@ -226,3 +226,35 @@ legend { padding: 0; margin-bottom: 8px; font-weight: 800; }
 .person .buddy { width: 40px; height: 40px; flex: none; }
 :fullscreen .host-top .hide-fs { display: none; }
 .type-btn[aria-pressed="true"] small.muted { color: var(--inv-muted); }
+.qtype { display: inline-flex; align-items: center; gap: 5px; }
+.type-btn .g svg, .feature .g svg { display: block; }
+.dropzone { display: flex; flex-direction: column; gap: 4px; padding: 18px; border: 2px dashed var(--border); border-radius: 16px; cursor: pointer; text-align: center; align-items: center; }
+.dropzone:hover { border-color: var(--glacier); background: var(--panel2); }
+#qedit.dropping { outline: 3px dashed var(--warm); outline-offset: 6px; }
+#qedit.dropping::after { content: "Drop the photo to add it"; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 18px 26px; border-radius: 18px; background: var(--warm); color: var(--warm-ink); font: 800 20px var(--body); z-index: 30; pointer-events: none; }
+.done-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 16px; border-top: 1.5px solid var(--border2); }
+@keyframes shake { 0%, 100% { transform: none; } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.shake { animation: shake .3s 2; }
+@media (prefers-reduced-motion: reduce) { .shake { animation: none; } }
+/* ---------- podium ---------- */
+.stage .q { position: relative; overflow: hidden; }
+.podium { display: flex; justify-content: center; align-items: flex-end; gap: 14px; padding-top: 10px; }
+.pod-spot { flex: 0 1 240px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pod-who { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; min-height: 168px; justify-content: flex-end; }
+.pod-who b { font-size: 21px; } .pod-who span { color: var(--muted); font-weight: 800; }
+.pod-hidden { justify-content: center; }
+.pod-q { font: 700 64px var(--display); color: var(--border); }
+.pod-spot.shown .pod-who { animation: popin .6s cubic-bezier(.2, 1.4, .4, 1); }
+.pod-block { width: 100%; border-radius: 18px 18px 6px 6px; background: var(--panel2); display: flex; justify-content: center; padding-top: 12px; box-shadow: inset 0 6px 0 rgba(255, 255, 255, .08); }
+.pod-block span { font: 700 54px var(--display); color: var(--muted); }
+.p1 .pod-block { background: var(--warm); } .p1 .pod-block span { color: var(--warm-ink); }
+.p2 .pod-block { background: #B8C9DD; } .p2 .pod-block span { color: #0B1F3A; }
+.p3 .pod-block { background: #D9A27A; } .p3 .pod-block span { color: #0B1F3A; }
+.trophy { width: 88px; height: 88px; animation: popin .7s cubic-bezier(.2, 1.4, .4, 1); }
+.pod-rest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pod-rest .chip svg { width: 26px; height: 26px; }
+@keyframes popin { from { transform: scale(.3) translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+.confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.confetti i { position: absolute; top: -20px; width: 10px; height: 14px; border-radius: 2px; animation: fall linear forwards; }
+@keyframes fall { to { transform: translateY(820px) rotate(540deg); opacity: .2; } }
+@media (prefers-reduced-motion: reduce) { .pod-spot.shown .pod-who, .trophy { animation: none; } }

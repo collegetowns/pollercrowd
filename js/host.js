@@ -148,14 +148,16 @@
   /* =========================================================
      Editor
      ========================================================= */
-  var deck = null, saveDeckSoon = PC.debounce(function () { if (deck) Store.saveDeck(deck); }, 500);
+  var deck = null, saveDeckLater = PC.debounce(function () { if (deck) { Store.saveDeck(deck); paintSaved(true); } }, 500);
+  function saveDeckSoon() { paintSaved(false); saveDeckLater(); }
+  function paintSaved(done) { var el = $("#saveState"); if (el) el.innerHTML = done ? '<span class="dot"></span>All changes saved' : '<span class="dot wait"></span>Saving…'; }
   function renderEdit() {
     deck = Store.deck(editId);
     if (needPhotos(deck.questions)) PC.images.preload(deck.questions).then(function () { if (view === "edit") renderEdit(); });
     if (editQ >= deck.questions.length) editQ = Math.max(0, deck.questions.length - 1);
     var allProblems = deck.questions.map(R.problems);
     var bad = allProblems.filter(function (p) { return p.length; }).length;
-    app.innerHTML = topBar('<button type="button" class="btn" data-act="home">← All sets</button><button type="button" class="btn primary" data-act="present" data-id="' + deck.id + '">Present</button>') +
+    app.innerHTML = topBar('<span class="chip" id="saveState" role="status"><span class="dot"></span>All changes saved</span><button type="button" class="btn" data-act="home">← All sets</button><button type="button" class="btn primary" data-act="present" data-id="' + deck.id + '">Present</button>') +
       '<main class="page stack-16"><label class="field" style="max-width:640px"><span>Question set name</span><input class="input" id="deckTitle" value="' + esc(deck.title) + '" maxlength="80"></label>' +
       (bad ? '<div class="banner warn" id="probBanner">' + bad + (bad === 1 ? " question needs" : " questions need") + " a little more before you present. Look for the ⚠ marks.</div>" : "") +
       '<div class="builder"><nav class="side" aria-label="Questions"><span class="label">Questions</span><div class="qlist" id="qlist">' + qlistHTML(allProblems) + '</div>' +
@@ -167,7 +169,7 @@
   function qlistHTML(probs) {
     return deck.questions.map(function (q, i) {
       return '<button type="button" class="qitem" data-act="pick-q" data-i="' + i + '" aria-current="' + (i === editQ) + '"><span class="num">' + (i + 1) + '</span><span class="t"><b>' + (esc(q.prompt) || '<span class="muted">New question</span>') +
-        "</b><small>" + R.TYPES[q.type].name + (probs[i].length ? ' · <span class="warm">⚠ needs work</span>' : "") + "</small></span></button>";
+        "</b><small class=\"qtype\">" + R.icon(q.type, 14) + R.TYPES[q.type].name + (probs[i].length ? ' · <span class="warm">⚠ needs work</span>' : ' · <span style="color:var(--live)">✓ ready</span>') + "</small></span></button>";
     }).join("") || '<p class="muted">No questions yet.</p>';
   }
   function refreshList() {
@@ -193,7 +195,7 @@
     var src = PC.images.cached(q.image);
     h += q.image ? '<div class="photo-edit"><img class="photo-thumb" src="' + (src || "") + '" alt=""><div class="stack-16" style="gap:8px;flex:1;min-width:220px"><label class="field"><span>Describe the photo <span class="muted">(for screen readers)</span></span><input class="input" data-f="imageAlt" maxlength="160" placeholder="e.g. Diagram of the layers of the atmosphere" value="' + esc(q.imageAlt || "") + '"></label>' +
       '<div class="controls"><button type="button" class="btn small" data-act="photo-add">Replace photo</button><button type="button" class="btn small danger" data-act="photo-del">Remove photo</button></div></div></div>'
-      : '<div class="controls"><button type="button" class="btn" data-act="photo-add" style="border-style:dashed">+ Add a photo</button><span class="note">Shows on the big screen next to the question.</span></div>';
+      : '<div class="dropzone" data-act="photo-add" role="button" tabindex="0"><b>+ Add a photo</b><span class="note">Drag one here, paste it, or click to choose. It shows on the big screen next to the question.</span></div>';
     if (q.options) {
       var isRank = q.type === "rk", canCorrect = q.type === "mc" || q.type === "qz";
       h += '<fieldset class="stack-16" style="gap:10px"><legend>' + (isRank ? "Items to rank" : "Answers") + (canCorrect ? (q.type === "qz" ? ' <span class="muted" style="font-weight:600">· mark the correct one</span>' : ' <span class="muted" style="font-weight:600">· marking a correct one is optional</span>') : "") + "</legend>" +
@@ -207,14 +209,15 @@
     }
     h += '<div class="grid2">';
     if (q.type === "mc") h += '<label class="check"><input type="checkbox" data-f="multi"' + (q.multi ? " checked" : "") + "> Students can pick more than one</label>" + '<label class="field"><span>Timer</span>' + sel("timer", TIMERS_MC, q.timer || 0) + "</label>";
-    if (q.type === "qz") h += '<label class="field"><span>Time to answer</span>' + sel("timer", TIMERS_QZ, q.timer || 20) + '</label><p class="note" style="align-self:end">Faster correct answers earn more points (500 to 1,000). The leaderboard adds up all quiz questions.</p>';
+    if (q.type === "qz") h += '<label class="field"><span>Time to answer</span>' + sel("timer", TIMERS_QZ, q.timer || 20) + '</label><p class="note" style="align-self:end">This is a competition: faster correct answers earn more points (500 to 1,000), points add up across all the quiz race questions in this set, and the session ends with a trophy podium.</p>';
     if (q.type === "wc") h += '<label class="field"><span>Words per student</span>' + sel("maxWords", [[1, "1 word"], [2, "Up to 2"], [3, "Up to 3"]], q.maxWords) + '</label><label class="check"><input type="checkbox" data-f="moderate"' + (q.moderate ? " checked" : "") + "> Hold words for my approval before they show</label>";
     if (q.type === "qa") h += '<label class="check"><input type="checkbox" data-f="moderate"' + (q.moderate ? " checked" : "") + '> Hold questions for my approval before they show</label><p class="note">Students can ask up to 3 questions and upvote each other’s.</p>';
     if (q.type === "rs") h += '<label class="field"><span>Scale</span>' + sel("scaleMax", [[5, "1 to 5"], [10, "1 to 10"]], q.scaleMax) + '</label><span></span><label class="field"><span>Label for 1</span><input class="input" data-f="lowLabel" value="' + esc(q.lowLabel) + '" maxlength="30"></label><label class="field"><span>Label for ' + q.scaleMax + '</span><input class="input" data-f="highLabel" value="' + esc(q.highLabel) + '" maxlength="30"></label>';
     if (q.type === "rk") h += '<p class="note">Students put the items in order on their phones. Results show the average place of each item.</p>';
     h += "</div>";
     var p = R.problems(q);
-    h += p.length ? '<div class="banner warn">⚠ ' + p.join(" ") + "</div>" : "";
+    h += p.length ? '<div class="banner warn" id="qprob">⚠ ' + p.join(" ") + "</div>" : "";
+    h += '<div class="done-row"><span class="note">Changes save automatically as you type.</span><button type="button" class="btn primary big" data-act="q-done">✓ Done with this question</button></div>';
     box.innerHTML = '<div class="stack-16" style="gap:20px">' + h + "</div>";
   }
   function onEditInput(e) {
@@ -231,18 +234,57 @@
   app.addEventListener("input", onEditInput);
   app.addEventListener("change", function (e) { if (e.target.type === "radio" || e.target.tagName === "SELECT" || e.target.type === "checkbox") onEditInput(e); });
 
+  function questionDone() {
+    var q = deck.questions[editQ], p = R.problems(q);
+    Store.saveDeck(deck); paintSaved(true); refreshList();
+    if (p.length) {
+      renderQEdit(); var pb = $("#qprob"); if (pb) { pb.scrollIntoView({ behavior: "smooth", block: "center" }); pb.classList.remove("shake"); void pb.offsetWidth; pb.classList.add("shake"); }
+      PC.toast("Almost there: " + p[0]); return;
+    }
+    var n = editQ + 1, last = editQ === deck.questions.length - 1;
+    var m = PC.modal("Question " + n + " is ready ✓", '<p>It’s saved in “' + esc(deck.title) + '”. What next?</p><div class="stack-16" style="gap:10px;margin-top:16px">' +
+      (last ? "" : '<button type="button" class="btn primary block" data-next="go">Edit question ' + (n + 1) + "</button>") +
+      '<button type="button" class="btn block' + (last ? " primary" : "") + '" data-next="add">+ Add another question</button>' +
+      '<button type="button" class="btn block" data-next="present">Present this set now</button>' +
+      '<button type="button" class="btn block" data-next="home">Back to all sets</button></div>');
+    m.el.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-next]"); if (!b) return; var a = b.getAttribute("data-next"); m.close();
+      if (a === "go") { editQ++; refreshList(); renderQEdit(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+      if (a === "add") addQuestion();
+      if (a === "present") startSession(deck.id);
+      if (a === "home") go("#");
+    });
+  }
+  async function usePhotoFile(f) {
+    if (!f || !/^image\//.test(f.type)) { PC.toast("That isn’t a photo. Try a JPG or PNG."); return; }
+    if (f.size > 25 * 1024 * 1024) { PC.toast("That photo is too big (over 25 MB). Try a smaller one."); return; }
+    try {
+      PC.toast("Adding photo…");
+      var id = await PC.images.add(f), q = deck.questions[editQ];
+      q.image = id; if (!q.imageAlt) q.imageAlt = "";
+      Store.saveDeck(deck); paintSaved(true); renderQEdit(); PC.toast("Photo added.");
+    } catch (e) { PC.toast("Couldn’t read that file. Try a JPG or PNG photo."); }
+  }
+  // Drag a photo anywhere onto the question editor, or paste one
+  document.addEventListener("dragover", function (e) {
+    if (view !== "edit" || !deck || !deck.questions.length || !e.dataTransfer || [].indexOf.call(e.dataTransfer.types, "Files") < 0) return;
+    e.preventDefault(); var b = $("#qedit"); if (b) b.classList.add("dropping");
+  });
+  document.addEventListener("dragleave", function (e) { if (!e.relatedTarget || !e.relatedTarget.closest || !e.relatedTarget.closest("#qedit")) { var b = $("#qedit"); if (b) b.classList.remove("dropping"); } });
+  document.addEventListener("drop", function (e) {
+    var b = $("#qedit"); if (b) b.classList.remove("dropping");
+    if (view !== "edit" || !deck || !deck.questions.length || !e.dataTransfer || !e.dataTransfer.files.length) return;
+    e.preventDefault(); usePhotoFile(e.dataTransfer.files[0]);
+  });
+  document.addEventListener("paste", function (e) {
+    if (view !== "edit" || !deck || !deck.questions.length || !e.clipboardData) return;
+    var item = [].filter.call(e.clipboardData.items || [], function (it) { return it.kind === "file" && /^image\//.test(it.type); })[0];
+    if (item) { e.preventDefault(); usePhotoFile(item.getAsFile()); }
+  });
+  document.addEventListener("keydown", function (e) { var d = e.target.closest && e.target.closest(".dropzone[data-act]"); if (d && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); d.click(); } });
   function pickPhoto() {
     var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
-    inp.onchange = async function () {
-      var f = inp.files[0]; if (!f) return;
-      if (f.size > 25 * 1024 * 1024) { PC.toast("That photo is too big (over 25 MB). Try a smaller one."); return; }
-      try {
-        PC.toast("Adding photo…");
-        var id = await PC.images.add(f), q = deck.questions[editQ];
-        q.image = id; if (!q.imageAlt) q.imageAlt = "";
-        Store.saveDeck(deck); renderQEdit(); PC.toast("Photo added.");
-      } catch (e) { PC.toast("Couldn’t read that file. Try a JPG or PNG photo."); }
-    };
+    inp.onchange = function () { usePhotoFile(inp.files[0]); };
     inp.click();
   }
   function addQuestion() {
@@ -392,6 +434,13 @@
       d.q.scores = mine;
       d.q.top = all.slice(0, 5).map(function (x) { return { b: x.k + "." + x.v + "." + x.l, nick: x.nick, pts: x.pts }; });
     }
+    if (s.podium) {
+      var lb = R.leaderboard(s, 0, null, true), sc = {};
+      lb.forEach(function (x) { sc[x.pub] = [x.rank, x.pts]; });
+      var step = s.podium.step;
+      d.podium = { step: step, n: lb.length, scores: step >= 3 ? sc : {},
+        top: lb.filter(function (x) { return x.rank <= 3 && x.rank > 3 - step; }).map(function (x) { return { b: x.k + "." + x.v + "." + x.l, nick: x.nick, pts: x.pts, rank: x.rank }; }) };
+    }
     return d;
   }
   // Throttled: teacher actions go out right away; joins and new questions are batched
@@ -522,6 +571,7 @@
   }
   function renderStage() {
     var box = $("#qbox"); if (!box || !live) return;
+    if (live.s.podium) { renderPodium(box); return; }
     var s = live.s, q = curQ(), st = curSt(), T = R.TYPES[q.type];
     var ctrl = [];
     ctrl.push('<button type="button" class="btn" data-act="prev"' + (s.qi === 0 ? " disabled" : "") + '>← Back</button>');
@@ -529,7 +579,7 @@
     else if (!st.revealed) ctrl.push('<button type="button" class="btn" data-act="toggle-open">' + (st.open ? "Close answers" : "Reopen answers") + "</button>");
     if (q.type !== "qz") ctrl.push('<button type="button" class="btn" data-act="toggle-results">' + (st.hideResults ? "Show results" : "Hide results") + "</button>");
     if ((q.type === "mc" && q.correct != null) || q.type === "qz") ctrl.push('<button type="button" class="btn' + (st.revealed ? "" : " solid") + '" data-act="reveal"' + (q.type === "qz" && !st.openedAt ? " disabled" : "") + ">" + (st.revealed ? "Hide answer" : "Reveal answer") + "</button>");
-    ctrl.push('<button type="button" class="btn primary" data-act="next">' + (s.qi === s.questions.length - 1 ? "Finish" : "Next →") + "</button>");
+    ctrl.push('<button type="button" class="btn primary" data-act="next">' + (s.qi === s.questions.length - 1 ? (hasQuiz(s) && !s.podiumShown ? "Show the podium →" : "Finish") : "Next →") + "</button>");
     box.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center"><span class="label">Question ' + (s.qi + 1) + " of " + s.questions.length + " · " + T.name +
       '</span><span class="chip" id="statusChip"></span></div><h1 class="q-title">' + esc(q.prompt) + "</h1></div>" +
       (q.image ? '<div class="q-body"><figure class="q-media"><button type="button" class="photo-btn" data-act="photo-zoom" aria-label="Show the photo larger"><img src="' + (PC.images.cached(q.image) || "") + '" alt="' + esc(q.imageAlt || "Photo for this question") + '"></button></figure><div id="resultsArea" aria-live="polite"></div></div>' : '<div id="resultsArea" aria-live="polite"></div>') +
@@ -538,7 +588,7 @@
     renderResultsArea(); paintTimer();
   }
   function renderResultsArea() {
-    var el = $("#resultsArea"); if (!el || !live) return;
+    var el = $("#resultsArea"); if (!el || !live || live.s.podium) return;
     var s = live.s, q = curQ(), st = curSt();
     var r = R.view(s, q, { controls: true });
     var n = r.data.total, label = q.type === "wc" ? r.data.entries + (r.data.entries === 1 ? " word" : " words") + " from " + n : q.type === "qa" ? r.data.items.length + (r.data.items.length === 1 ? " question" : " questions") : n + (n === 1 ? " answer" : " answers");
@@ -765,15 +815,19 @@
         if (oq.correct != null) { if (oq.correct === oi) oq.correct = oq.type === "qz" ? 0 : null; else if (oq.correct > oi) oq.correct--; }
         Store.saveDeck(deck); refreshList(); renderQEdit(); break;
       case "photo-add": pickPhoto(); break;
+      case "q-done": questionDone(); break;
       case "photo-del": delete deck.questions[editQ].image; delete deck.questions[editQ].imageAlt; Store.saveDeck(deck); renderQEdit(); break;
       case "photo-zoom": var zi = $(".q-media img"); if (zi) PC.modal(curQ().prompt, '<img src="' + zi.src + '" alt="' + esc(zi.alt) + '" style="width:100%;border-radius:16px;display:block">', { wide: true }); break;
       case "no-correct": deck.questions[editQ].correct = null; Store.saveDeck(deck); renderQEdit(); break;
       // ---- live ----
       case "prev": openQuestion(live.s.qi - 1); break;
       case "next":
-        if (live.s.qi === live.s.questions.length - 1) endSession();
+        if (live.s.qi === live.s.questions.length - 1) { if (hasQuiz(live.s) && !live.s.podiumShown) openPodium(); else endSession(); }
         else openQuestion(live.s.qi + 1);
         break;
+      case "podium-next": live.s.podium.step = nextStep(); sendState(true); saveSoon(); renderStage(); break;
+      case "podium-back": live.s.podium = null; sendState(true); saveSoon(); renderStage(); break;
+      case "end": endSession(); break;
       case "start": startVoting(curSt(), curQ()); sendState(true); saveSoon(); renderStage(); break;
       case "toggle-open": var so = curSt(); if (so.open) { so.open = false; so.endsAt = null; } else startVoting(so, curQ()); sendState(true); saveSoon(); renderStage(); break;
       case "toggle-results": curSt().hideResults = !curSt().hideResults; saveSoon(); renderStage(); break;
@@ -796,6 +850,7 @@
       '<button type="button" class="btn block" data-m="lock">' + (s.locked ? "Unlock the room" : "Lock the room (no new students)") + "</button>" +
       '<button type="button" class="btn block" data-m="reset">Clear answers to this question</button>' +
       '<button type="button" class="btn block" data-m="jump">Jump to a question…</button>' +
+      (hasQuiz(s) ? '<button type="button" class="btn block" data-m="podium">Show the competition podium</button>' : "") +
       '<button type="button" class="btn block" data-m="home">Leave this screen (room stays open)</button>' +
       '<button type="button" class="btn block danger" data-m="end">End the session</button>' +
       '<p class="note">Keyboard: → next, ← back, Space opens or closes answers, R shows or hides results, F full screen.</p></div>');
@@ -812,8 +867,49 @@
         jm.el.addEventListener("click", function (ev) { var jb = ev.target.closest("[data-j]"); if (jb) { jm.close(); openQuestion(+jb.getAttribute("data-j")); } });
       }
       if (a === "home") go("#");
+      if (a === "podium") openPodium();
       if (a === "end") endSession();
     });
+  }
+  /* ---------- competition podium ---------- */
+  function hasQuiz(s) { return s.questions.some(function (q) { return q.type === "qz"; }); }
+  function openPodium() {
+    var s = live.s; s.podium = { step: 0 }; s.podiumShown = true;
+    var st = curSt(); if (st.open) { st.open = false; st.endsAt = null; }
+    sendState(true); saveSoon(); renderStage();
+  }
+  // With fewer than 3 players, skip the empty steps
+  function nextStep() {
+    var s = live.s, step = s.podium.step, n = R.leaderboard(s, 0, null, true).length;
+    if (step === 0) return n >= 3 ? 1 : n === 2 ? 2 : 3;
+    return Math.min(3, step + 1);
+  }
+  function renderPodium(box) {
+    var s = live.s, step = s.podium.step, lb = R.leaderboard(s, 0, null, true);
+    var byRank = function (r) { return lb.filter(function (x) { return x.rank === r; }); };
+    function spot(place, h) {
+      var people = byRank(place), shown = step >= 4 - place && people.length;
+      var who = shown ? people.map(function (x) { return '<div class="pod-who">' + B.svg(x.k, x.v, x.l, people.length > 1 ? 90 : 128) + '<b>' + esc(R.buddyName(x)) + '</b><span>' + x.pts + " pts</span></div>"; }).join("") :
+        '<div class="pod-who pod-hidden"><span class="pod-q">?</span></div>';
+      return '<div class="pod-spot p' + place + (shown ? " shown" : "") + '">' + (place === 1 && shown ? R.TROPHY : "") + who + '<div class="pod-block" style="height:' + h + 'px"><span>' + place + "</span></div></div>";
+    }
+    var next = { 1: "Reveal 3rd place", 2: "Reveal 2nd place", 3: "Reveal the winner!" }[nextStep()];
+    var rest = step >= 3 ? lb.filter(function (x) { return x.rank > 3; }).slice(0, 7) : [];
+    box.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px;text-align:center"><span class="label">Competition results · ' + lb.length + (lb.length === 1 ? " player" : " players") + '</span><h1 class="q-title">' + (step >= 3 ? "Top of the iceberg!" : "And the winners are…") + "</h1></div>" +
+      (lb.length ? '<div class="podium">' + spot(2, 150) + spot(1, 210) + spot(3, 110) + "</div>" : '<div class="frozen"><h3>No quiz answers yet</h3><p class="muted">Run a quiz race question first, then come back here.</p></div>') +
+      (rest.length ? '<div class="pod-rest">' + rest.map(function (x) { return '<span class="chip">' + x.rank + ". " + B.svg(x.k, x.v, x.l, 26) + esc(R.buddyName(x)) + " · " + x.pts + "</span>"; }).join("") + "</div>" : "") +
+      '<div class="controls" id="ctrl" style="justify-content:center"><button type="button" class="btn" data-act="podium-back">← Back to questions</button>' +
+      (step < 3 && lb.length ? '<button type="button" class="btn primary big" data-act="podium-next">' + next + "</button>" : "") +
+      '<button type="button" class="btn' + (step >= 3 || !lb.length ? " primary" : "") + '" data-act="end">End session</button></div>';
+    if (step >= 3 && !box.getAttribute("data-confetti")) { box.setAttribute("data-confetti", "1"); confetti(box); }
+    if (step < 3) box.removeAttribute("data-confetti");
+  }
+  function confetti(box) {
+    if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var wrap = document.createElement("div"); wrap.className = "confetti"; wrap.setAttribute("aria-hidden", "true");
+    var cols = ["#FFB547", "#EAF6FF", "#5FB6EC", "#6EE7A8", "#FF8FB1"], h = "";
+    for (var i = 0; i < 70; i++) h += '<i style="left:' + (Math.random() * 100) + "%;background:" + cols[i % 5] + ";animation-delay:" + (Math.random() * 1.2).toFixed(2) + "s;animation-duration:" + (2.2 + Math.random() * 1.6).toFixed(2) + "s;" + (i % 3 ? "" : "border-radius:50%;") + '"></i>';
+    wrap.innerHTML = h; box.appendChild(wrap); setTimeout(function () { wrap.remove(); }, 4500);
   }
   function toggleFS() { if (document.fullscreenElement) document.exitFullscreen(); else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {}); }
   async function endSession() {
@@ -824,7 +920,7 @@
   }
   document.addEventListener("keydown", function (e) {
     if (view !== "live" || !live || e.target.closest("input,textarea,select,[contenteditable]") || $(".modal") || e.metaKey || e.ctrlKey || e.altKey) return;
-    var map = { ArrowRight: "next", ArrowLeft: "prev", " ": "toggle-open", r: "toggle-results", R: "toggle-results" };
+    var map = live.s.podium ? { ArrowRight: "podium-next", " ": "podium-next" } : { ArrowRight: "next", ArrowLeft: "prev", " ": "toggle-open", r: "toggle-results", R: "toggle-results" };
     if (e.key === "f" || e.key === "F") { toggleFS(); return; }
     var act = map[e.key]; if (!act) return;
     var btn = $('#ctrl [data-act="' + act + '"]') || (act === "toggle-open" ? $('#ctrl [data-act="start"]') : null);

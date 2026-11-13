@@ -103,6 +103,7 @@
     else if (screen === "pick") h = pickScreen();
     else if (!state) h = header() + waitCard("Finding the igloo…", status === "SUBSCRIBED" ? "Waiting for the teacher’s screen. Make sure the room is open on the projector." : "Connecting to the room…", true) + (Date.now() - gotAt > 8000 ? '<p class="note" style="text-align:center">Still waiting? Double-check the room code, or scan the QR code again.</p>' : "");
     else if (state.locked && !state.roster[me]) h = header() + waitCard("This room is locked", "The teacher has closed the doors for now. Ask them to unlock it.", false);
+    else if (state.podium) h = header() + podiumScreen();
     else h = header() + questionScreen();
     app.innerHTML = '<div class="phone">' + h + footer() + "</div>";
     PC.initThemeButtons(); paintStatus();
@@ -215,6 +216,18 @@
       }).join("") : '<p class="muted">No questions yet. Be the first!</p>') + "</div>" +
         (q.open ? "" : '<div class="sent" style="color:var(--muted)">Questions are closed.</div>');
     }
+    return h;
+  }
+  function ordinal(n) { var s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+  function podiumScreen() {
+    var p = state.podium, mine = p.scores && p.scores[me], h = '<div class="wait-card" style="gap:10px">';
+    if (p.step < 3) h += '<h1 style="font-size:30px">Drumroll…</h1><p class="muted">Watch the big screen for the podium!</p>';
+    else if (mine) h += window.PCResults.TROPHY.replace('class="trophy"', 'class="trophy" style="width:' + (mine[0] <= 3 ? 90 : 60) + 'px;height:' + (mine[0] <= 3 ? 90 : 60) + 'px"') +
+      '<h1 style="font-size:30px">' + (mine[0] === 1 ? "You won!" : mine[0] <= 3 ? "You’re on the podium!" : "Great racing!") + '</h1><p style="font-size:19px">You finished <b>' + ordinal(mine[0]) + "</b> of " + p.n + " with <b>" + mine[1] + "</b> points.</p>";
+    else h += '<h1 style="font-size:28px">Top of the iceberg!</h1><p class="muted">Thanks for playing along.</p>';
+    h += "</div>";
+    var top = (p.top || []).slice().sort(function (a, b) { return a.rank - b.rank; });
+    if (top.length) h += '<div class="stack-16" style="gap:8px"><span class="label">Podium</span>' + top.map(function (x) { var c = x.b.split("."); return '<div class="leader"><span class="rank">' + x.rank + "</span>" + B.svg(c[0], +c[1], c[2], 40) + '<span class="who">' + esc(x.nick || B.describe(c[0], +c[1], c[2])) + '</span><span class="pts">' + x.pts + "</span></div>"; }).join("") + "</div>";
     return h;
   }
   function statusLine(q, mine, sentText) {

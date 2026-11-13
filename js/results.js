@@ -4,12 +4,12 @@
   var esc = function (s) { return window.PC.esc(s); };
 
   var TYPES = {
-    mc: { name: "Multiple choice", hint: "Pick one answer", glyph: "A" },
-    wc: { name: "Word cloud", hint: "Short words grow big", glyph: "W" },
-    rs: { name: "Rating scale", hint: "1 to 5 or 1 to 10", glyph: "5" },
-    qa: { name: "Open Q&A", hint: "Questions + upvotes", glyph: "?" },
-    qz: { name: "Quiz race", hint: "Timed, with a leaderboard", glyph: "Q" },
-    rk: { name: "Ranking", hint: "Put items in order", glyph: "#" }
+    mc: { name: "Multiple choice", hint: "Pick one answer", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1.5"/><rect x="3" y="10" width="12" height="4" rx="1.5"/><rect x="3" y="16" width="7" height="4" rx="1.5"/></svg>' },
+    wc: { name: "Word cloud", hint: "Short words grow big", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.3 4.6 4.6 0 0 0 7 18.5z"/></svg>' },
+    rs: { name: "Rating scale", hint: "1 to 5 or 1 to 10", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/></svg>' },
+    qa: { name: "Open Q&A", hint: "Questions + upvotes", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4.5h16v11.5H10l-6 4.5z"/><path d="M10 8.7a2 2 0 1 1 2.7 1.9c-.45.2-.7.55-.7 1.05v.35"/><path d="M12 13.9v.1"/></svg>' },
+    qz: { name: "Quiz race", hint: "Competition: speed scores points", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 2.5h5M12 6V2.5M18.5 6.5l1.5-1.5"/></svg>' },
+    rk: { name: "Ranking", hint: "Put items in order", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6h10M10 12h7M10 18h4"/><path d="M4.5 4.5l1-.8v4.3M3.8 11.2a1.1 1.1 0 1 1 1.9.8L3.8 14.4h2.2M3.8 16.6h2.1l-1.1 1.3a1.15 1.15 0 1 1-1.1 1.6"/></svg>' }
   };
   var LETTERS = "ABCDEFGH";
 
@@ -95,12 +95,12 @@
     return r;
   }
   // Cumulative quiz points across the session (up to and including question `uptoId` if given)
-  function leaderboard(session, limit, uptoId) {
+  function leaderboard(session, limit, uptoId, all) {
     var tot = {}, ids = [];
     for (var i = 0; i < session.questions.length; i++) {
       var q = session.questions[i]; if (q.type !== "qz") continue;
       var st = (session.status || {})[q.id] || {};
-      if (st.revealed) ids.push(q.id);
+      if (st.revealed || (all && st.openedAt)) ids.push(q.id);
       if (q.id === uptoId) break;
     }
     ids.forEach(function (id) {
@@ -179,5 +179,7 @@
     return { html: h, data: r };
   }
 
-  window.PCResults = { TYPES: TYPES, LETTERS: LETTERS, blank: blank, convert: convert, cleanOptions: cleanOptions, problems: problems, compute: compute, view: view, leaderboard: leaderboard, quizPoints: quizPoints, normWord: normWord, buddyName: buddyName };
+  function icon(k, w) { return TYPES[k] ? TYPES[k].glyph.replace(/width="20" height="20"/, 'width="' + (w || 20) + '" height="' + (w || 20) + '"') : ""; }
+  var TROPHY = '<svg class="trophy" viewBox="0 0 64 64" aria-hidden="true"><path d="M21 10H11v5a10 10 0 0 0 10 10M43 10h10v5a10 10 0 0 1-10 10" fill="none" stroke="#1B2440" stroke-width="3.5" stroke-linecap="round"/><path d="M20 6h24v17a12 12 0 0 1-24 0z" fill="#FFB547" stroke="#1B2440" stroke-width="3.5" stroke-linejoin="round"/><path d="M32 12l2.2 4.4 4.8.7-3.5 3.4.8 4.8-4.3-2.3-4.3 2.3.8-4.8-3.5-3.4 4.8-.7z" fill="#FFF4D6"/><path d="M28 35h8v8h-8z" fill="#E8892B" stroke="#1B2440" stroke-width="3.5" stroke-linejoin="round"/><rect x="19" y="43" width="26" height="9" rx="2.5" fill="#FFB547" stroke="#1B2440" stroke-width="3.5"/></svg>';
+  window.PCResults = { TROPHY: TROPHY, icon: icon, TYPES: TYPES, LETTERS: LETTERS, blank: blank, convert: convert, cleanOptions: cleanOptions, problems: problems, compute: compute, view: view, leaderboard: leaderboard, quizPoints: quizPoints, normWord: normWord, buddyName: buddyName };
 })();

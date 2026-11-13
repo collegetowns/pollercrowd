@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy · Poller Crowd</title>
+<meta name="description" content="What Poller Crowd stores: almost nothing. No student accounts, names or emails.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/pollercrowd.css">
+<script src="js/config.js"></script>
+<style>.doc{max-width:780px;margin:0 auto;padding:10px 24px 30px;display:flex;flex-direction:column;gap:16px}.doc h1{font-size:40px}.doc h2{font-size:24px;margin-top:14px}.doc li{margin:6px 0}.doc ol,.doc ul{padding-left:24px;margin:0}.doc code{background:var(--panel2);padding:2px 6px;border-radius:6px;font-size:15px}</style>
+</head>
+<body class="snow">
+<header class="host-top"><a class="brand" href="index.html" id="brand"></a><div class="tools"><div data-theme-btn="seg"></div></div></header>
+<main class="doc">
+<span class="label">Privacy</span>
+<h1>What Poller Crowd keeps (almost nothing)</h1>
+<p style="font-size:19px">Poller Crowd is built so that schools don’t have to worry about student data.</p>
+<h2>Students</h2>
+<ul>
+<li><b>No accounts, names or emails.</b> Students join with a room code and pick a cartoon buddy. A nickname is optional and only shows on quiz leaderboards.</li>
+<li><b>Answers are anonymous.</b> The teacher sees buddies, not people.</li>
+<li><b>Nothing is stored on a server.</b> Answers travel from the phone to the teacher’s screen through a live connection (Supabase Realtime) and are not saved there.</li>
+<li>The phone remembers a random ID, its buddy and its own answers so a page reload doesn’t lose them. These are deleted after a week.</li>
+</ul>
+<h2>Teachers</h2>
+<ul>
+<li>Question sets and results are saved only in the teacher’s own browser. They never leave that computer unless the teacher exports them.</li>
+<li>Past sessions are deleted automatically after 30 days. Teachers can delete them sooner in Settings.</li>
+</ul>
+<h2>Visitor counts</h2>
+<p>We may count page visits with <a href="https://www.goatcounter.com" target="_blank" rel="noopener">GoatCounter</a>, which uses no cookies and doesn’t track people across sites. Only the page name is counted (like “join.html”), never room codes, answers or anything typed.</p>
+<h2>Fonts and code</h2>
+<p>Fonts and code libraries are served from this site, so your browser doesn’t contact Google Fonts or other outside services to show the page.</p>
+<h2>Rude words</h2>
+<p>Common swear words and slurs are replaced with symbols like #!*&amp; before they reach the big screen. No filter catches everything, so teachers can also hold word cloud and Q&amp;A answers for approval, hide anything, and remove a student from the room.</p>
+<h2>Questions</h2>
+<p>Use the <button type="button" class="linkbtn" data-feedback>feedback form</button> and we’ll get back to you. If your school needs a formal data agreement, the short version is: no student personal data is collected or stored.</p>
+</main>
+<footer id="credits"></footer>
+<script src="js/core.js"></script>
+<script>PC.$("#brand").innerHTML = PC.logo(44) + '<span class="stack"><span class="brand-name">Poller Crowd</span><span class="brand-tag">Warm up the lecture</span></span>'; PC.initThemeButtons(); PC.credits(PC.$("#credits"));</script>
+</body>
+</html>

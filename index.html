@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Poller Crowd · Warm up the lecture</title>
+<meta name="description" content="Free live polls, word clouds, quizzes, rankings and Q&A for classes and lectures. Students join by QR code: no app, no accounts. From College Towns.">
+<meta property="og:title" content="Poller Crowd">
+<meta property="og:description" content="Warm up the lecture. Free live polls, word clouds, quizzes and Q&A. Students scan a QR code to join.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0B1F3A">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/pollercrowd.css">
+<script src="js/config.js"></script>
+<style>
+  .hero { max-width: 1120px; margin: 0 auto; padding: 8px 24px 10px; display: flex; flex-wrap: wrap; gap: 28px; align-items: center; }
+  .hero .copy { flex: 999 1 420px; display: flex; flex-direction: column; gap: 14px; }
+  .hero h1 { font-size: clamp(40px, 6vw, 68px); }
+  .hero .art { flex: 1 1 300px; display: flex; justify-content: center; }
+  .doors { max-width: 1120px; margin: 0 auto; padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
+  .door { display: flex; flex-direction: column; gap: 14px; }
+  .features { max-width: 1120px; margin: 0 auto; padding: 10px 24px 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .feature { padding: 18px 20px; border-radius: 20px; background: var(--panel); display: flex; gap: 14px; align-items: flex-start; }
+  .feature .g { flex: none; display: inline-flex; width: 38px; height: 38px; border-radius: 11px; align-items: center; justify-content: center; background: var(--panel2); color: var(--label); font: 600 18px var(--display); }
+  .buddy-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .buddy-row .buddy { width: 62px; height: 62px; }
+</style>
+</head>
+<body class="snow">
+<header class="host-top"><a class="brand" href="index.html" id="brand"></a><div class="tools"><div data-theme-btn="seg"></div></div></header>
+<main>
+  <section class="hero">
+    <div class="copy">
+      <h1>Poller Crowd</h1>
+      <p class="warm" style="font-weight:800;font-size:22px">Warm up the lecture.</p>
+      <p style="font-size:19px;max-width:560px">Live polls, word clouds, quizzes, rankings and Q&amp;A for your class. Students scan a QR code and answer from their phones. No app, no accounts, and answers stay anonymous.</p>
+    </div>
+    <div class="art" id="igloo"></div>
+  </section>
+
+  <section class="doors">
+    <form class="card door" id="joinForm" aria-labelledby="jt">
+      <span class="label">Students</span>
+      <h2 id="jt" style="font-size:30px">Joining a class?</h2>
+      <label class="field"><span>Room code from the big screen</span>
+        <input class="input" id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="IGLOO 482" style="text-align:center;font:700 28px var(--display);letter-spacing:3px;min-height:60px"></label>
+      <p class="warm" id="err" role="alert" style="font-weight:700;min-height:1.2em;margin:0"></p>
+      <button class="btn primary big" type="submit">Join the crowd</button>
+    </form>
+    <div class="card door">
+      <span class="label">Teachers &amp; lecturers</span>
+      <h2 style="font-size:30px">Running a class?</h2>
+      <p class="muted">Build a question set, put it on the projector, and watch the answers roll in. Everything you make is saved on your own computer.</p>
+      <a class="btn primary big" href="host.html" style="margin-top:auto">Open the teacher screen</a>
+      <a class="btn" href="setup.html" style="align-self:flex-start">Use your own free Supabase (optional)</a>
+    </div>
+  </section>
+
+  <section class="features" aria-label="Activities">
+    <div class="feature"><span class="g">A</span><div><b>Multiple choice</b><p class="muted">Live bars, with an optional correct answer to reveal.</p></div></div>
+    <div class="feature"><span class="g">W</span><div><b>Word cloud</b><p class="muted">Popular words grow big. Rude ones turn into #!*&amp;.</p></div></div>
+    <div class="feature"><span class="g">5</span><div><b>Rating scale</b><p class="muted">1 to 5 or 1 to 10, with an average and a chart.</p></div></div>
+    <div class="feature"><span class="g">?</span><div><b>Open Q&amp;A</b><p class="muted">Anonymous questions that classmates can upvote.</p></div></div>
+    <div class="feature"><span class="g">Q</span><div><b>Quiz race</b><p class="muted">Timed questions, points for speed, a leaderboard.</p></div></div>
+    <div class="feature"><span class="g">#</span><div><b>Ranking</b><p class="muted">Students put items in order; see the class consensus.</p></div></div>
+  </section>
+
+  <section style="max-width:1120px;margin:0 auto;padding:22px 24px 6px;text-align:center" class="stack-16">
+    <h2 style="font-size:28px">Pick a buddy, any buddy</h2>
+    <p class="muted">Ten polar buddies, four color patterns and five looks. That’s 200 combinations, so a whole class can be different.</p>
+    <div class="buddy-row" id="buddies"></div>
+  </section>
+</main>
+<footer id="credits"></footer>
+<script src="js/core.js"></script>
+<script src="js/buddies.js"></script>
+<script>
+  (function () {
+    var PC = window.PC, B = window.PCBuddies;
+    PC.$("#brand").innerHTML = PC.logo(44) + '<span class="stack"><span class="brand-name">Poller Crowd</span><span class="brand-tag">Warm up the lecture</span></span>';
+    PC.$("#igloo").innerHTML = PC.igloo(340);
+    var looks = ["none", "beanie", "sunglasses", "glasses", "beard"];
+    PC.$("#buddies").innerHTML = B.ORDER.map(function (k, i) { return B.svg(k, i % 4, looks[(i * 3) % 5], 62); }).join("");
+    PC.initThemeButtons(); PC.credits(PC.$("#credits"));
+    PC.$("#joinForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var c = PC.normCode(PC.$("#code").value);
+      if (!c || PC.WORDS.indexOf(c.split("-")[0]) < 0) { PC.$("#err").textContent = "Room codes are a word and three numbers, like IGLOO 482."; return; }
+      location.href = "join.html?r=" + encodeURIComponent(c);
+    });
+  })();
+</script>
+</body>
+</html>

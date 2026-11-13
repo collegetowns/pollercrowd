@@ -1,0 +1,760 @@
+/* Poller Crowd — teacher app: question sets, builder, live room, results. */
+(function () {
+  "use strict";
+  var PC = window.PC, R = window.PCResults, B = window.PCBuddies, F = window.PCFilter;
+  var $ = PC.$, $$ = PC.$$, esc = PC.esc;
+  var app = $("#app");
+
+  /* =========================================================
+     Storage: question sets (decks) and sessions live only in this browser
+     ========================================================= */
+  var Store = {
+    decks: function () { return PC.store.get("decks", []); },
+    deck: function (id) { return PC.store.get("deck." + id, null); },
+    saveDeck: function (d) {
+      d.updated = Date.now();
+      PC.store.set("deck." + d.id, d);
+      var list = Store.decks().filter(function (x) { return x.id !== d.id; });
+      list.unshift({ id: d.id, title: d.title, n: d.questions.length, updated: d.updated });
+      PC.store.set("decks", list);
+    },
+    delDeck: function (id) { PC.store.del("deck." + id); PC.store.set("decks", Store.decks().filter(function (x) { return x.id !== id; })); },
+    sessions: function () { return PC.store.get("sessions", []); },
+    session: function (id) { return PC.store.get("session." + id, null); },
+    saveSession: function (s) {
+      var ok = PC.store.set("session." + s.id, s);
+      var list = Store.sessions().filter(function (x) { return x.id !== s.id; });
+      list.unshift({ id: s.id, title: s.title, code: s.code, startedAt: s.startedAt, endedAt: s.endedAt || null, people: Object.keys(s.roster || {}).length, n: s.questions.length });
+      PC.store.set("sessions", list);
+      if (!ok) PC.toast("This browser's storage is full. Export your results, then delete old sessions.", 6000);
+    },
+    delSession: function (id) { PC.store.del("session." + id); PC.store.set("sessions", Store.sessions().filter(function (x) { return x.id !== id; })); if (PC.store.get("live") === id) PC.store.del("live"); },
+    settings: function () { return Object.assign({ hold: false, liveResults: true, banned: [] }, PC.store.get("settings", {})); },
+    saveSettings: function (s) { PC.store.set("settings", s); F.setCustom(s.banned); }
+  };
+  F.setCustom(Store.settings().banned);
+
+  // Delete finished sessions older than the configured number of days
+  (function cleanup() {
+    var days = +(PC.cfg.keepSessionsDays || 30), cut = Date.now() - days * 864e5;
+    Store.sessions().forEach(function (x) { if (x.endedAt && x.endedAt < cut) Store.delSession(x.id); });
+  })();
+
+  function sampleDeck() {
+    var q = function (type, o) { return Object.assign(R.blank(type), o); };
+    return {
+      id: PC.uid(8), title: "Sample: Earth Science 101", updated: Date.now(), questions: [
+        q("rs", { prompt: "How awake are you right now?", scaleMax: 5, lowLabel: "Still asleep", highLabel: "Wide awake" }),
+        q("wc", { prompt: "In one word, what is the atmosphere?", maxWords: 3 }),
+        q("mc", { prompt: "Which layer of the atmosphere do we live in?", options: ["Troposphere", "Stratosphere", "Mesosphere", "Thermosphere"], correct: 0 }),
+        q("qz", { prompt: "Which gas makes up most of the air we breathe?", options: ["Oxygen", "Nitrogen", "Carbon dioxide", "Argon"], correct: 1, timer: 20 }),
+        q("rk", { prompt: "Rank these layers from lowest to highest.", options: ["Stratosphere", "Troposphere", "Thermosphere", "Mesosphere"] }),
+        q("qa", { prompt: "What's still foggy about today's lecture?" })
+      ]
+    };
+  }
+  if (!PC.store.get("seeded")) { Store.saveDeck(sampleDeck()); PC.store.set("seeded", true); }
+
+  /* =========================================================
+     Router
+     ========================================================= */
+  var view = "home", editId = null, editQ = 0;
+  function go(hash) { if (location.hash !== hash) location.hash = hash; else route(); }
+  function route() {
+    var h = location.hash.replace(/^#/, "").split("/");
+    if (live && h[0] !== "live") pauseLiveView();
+    if (h[0] === "edit" && Store.deck(h[1])) { view = "edit"; editId = h[1]; renderEdit(); }
+    else if (h[0] === "live" && PC.store.get("live")) { view = "live"; resumeLive(); }
+    else if (h[0] === "results" && Store.session(h[1])) { view = "results"; renderResults(h[1]); }
+    else { view = "home"; renderHome(); }
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener("hashchange", route);
+
+  function topBar(inner) {
+    return '<header class="host-top"><a class="brand" href="#">' + PC.logo(44) + '<span class="stack"><span class="brand-name">Poller Crowd</span><span class="brand-tag">Warm up the lecture</span></span></a>' +
+      '<div class="tools">' + (inner || "") + '<div data-theme-btn="seg" class="hide-fs"></div><button type="button" class="btn icon hide-fs" data-act="settings" aria-label="Settings" title="Settings">' + GEAR + "</button></div></header>";
+  }
+  var GEAR = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+  function footer() { return '<footer id="credits"></footer>'; }
+  function finish() { PC.initThemeButtons(); var c = $("#credits"); if (c) PC.credits(c); }
+  function fmtDate(t) { return t ? new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : ""; }
+  function serverBanner() {
+    var srv = PC.server.current();
+    if (srv.mode === "demo") return '<div class="banner warn"><span><b>Demo mode.</b> Students have to be in other tabs of this same browser, so it’s only for trying things out. ' +
+      (PC.server.site() ? 'Switch back to the shared server in <button type="button" class="linkbtn" data-act="settings">Settings</button>.' : 'To use real phones, add your Supabase project to <code>js/config.js</code> (see README), or connect your own in <button type="button" class="linkbtn" data-act="settings">Settings</button>.') + "</span></div>";
+    if (srv.own) return '<div class="banner"><span>Using <b>your own Supabase project</b> (' + esc(srv.url.replace(/^https:\/\//, "")) + '). Change this in <button type="button" class="linkbtn" data-act="settings">Settings</button>.</span></div>';
+    return "";
+  }
+
+  /* =========================================================
+     Home: question sets and past sessions
+     ========================================================= */
+  function renderHome() {
+    var decks = Store.decks(), sessions = Store.sessions(), liveId = PC.store.get("live"), ls = liveId && Store.session(liveId);
+    app.innerHTML = topBar() + '<main class="page stack-16" style="gap:22px">' + serverBanner() +
+      (ls && !ls.endedAt ? '<div class="banner warn" style="align-items:center;justify-content:space-between;flex-wrap:wrap"><span><b>A live session is still open:</b> ' + esc(ls.title) + " · room " + esc(ls.code) + '</span><span class="controls"><button type="button" class="btn primary" data-act="resume">Back to the room</button><button type="button" class="btn" data-act="end-old">End it</button></span></div>' : "") +
+      '<section class="stack-16"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between"><h1 style="font-size:34px">Your question sets</h1><div class="controls">' +
+      '<button type="button" class="btn" data-act="import">Import a set</button><button type="button" class="btn primary" data-act="new-deck">+ New question set</button></div></div>' +
+      (decks.length ? decks.map(function (d) {
+        return '<div class="deck-row"><div class="t"><b style="font-size:19px">' + esc(d.title || "Untitled") + '</b><div class="muted">' + d.n + (d.n === 1 ? " question" : " questions") + " · edited " + fmtDate(d.updated) + '</div></div><div class="controls">' +
+          '<button type="button" class="btn primary" data-act="present" data-id="' + d.id + '">Present</button><button type="button" class="btn" data-act="edit" data-id="' + d.id + '">Edit</button>' +
+          '<button type="button" class="btn small" data-act="dup" data-id="' + d.id + '">Duplicate</button><button type="button" class="btn small" data-act="export-deck" data-id="' + d.id + '">Download</button><button type="button" class="btn small danger" data-act="del-deck" data-id="' + d.id + '">Delete</button></div></div>';
+      }).join("") : '<p class="muted">No question sets yet. Make one, or import one a colleague shared.</p>') + "</section>" +
+      '<section class="stack-16"><h2 style="font-size:26px">Past sessions</h2>' +
+      (sessions.length ? sessions.map(function (x) {
+        return '<div class="deck-row"><div class="t"><b>' + esc(x.title) + '</b><div class="muted">' + fmtDate(x.startedAt) + " · room " + esc(x.code) + " · " + x.people + (x.people === 1 ? " student" : " students") + (x.endedAt ? "" : " · still open") + '</div></div><div class="controls">' +
+          '<button type="button" class="btn" data-act="results" data-id="' + x.id + '">Results &amp; export</button><button type="button" class="btn small danger" data-act="del-session" data-id="' + x.id + '">Delete</button></div></div>';
+      }).join("") : '<p class="muted">Results from your sessions will show up here. They stay only on this computer and are deleted after ' + (+(PC.cfg.keepSessionsDays || 30)) + " days.</p>") +
+      "</section></main>" + footer();
+    finish();
+  }
+
+  /* =========================================================
+     Editor
+     ========================================================= */
+  var deck = null, saveDeckSoon = PC.debounce(function () { if (deck) Store.saveDeck(deck); }, 500);
+  function renderEdit() {
+    deck = Store.deck(editId);
+    if (editQ >= deck.questions.length) editQ = Math.max(0, deck.questions.length - 1);
+    var allProblems = deck.questions.map(R.problems);
+    var bad = allProblems.filter(function (p) { return p.length; }).length;
+    app.innerHTML = topBar('<button type="button" class="btn" data-act="home">← All sets</button><button type="button" class="btn primary" data-act="present" data-id="' + deck.id + '">Present</button>') +
+      '<main class="page stack-16"><label class="field" style="max-width:640px"><span>Question set name</span><input class="input" id="deckTitle" value="' + esc(deck.title) + '" maxlength="80"></label>' +
+      (bad ? '<div class="banner warn" id="probBanner">' + bad + (bad === 1 ? " question needs" : " questions need") + " a little more before you present. Look for the ⚠ marks.</div>" : "") +
+      '<div class="builder"><nav class="side" aria-label="Questions"><span class="label">Questions</span><div class="qlist" id="qlist">' + qlistHTML(allProblems) + '</div>' +
+      '<button type="button" class="btn" data-act="add-q" style="border-style:dashed">+ Add a question</button></nav>' +
+      '<section class="main card" id="qedit"></section></div></main>' + footer();
+    renderQEdit(); finish();
+    $("#deckTitle").addEventListener("input", function (e) { deck.title = e.target.value; saveDeckSoon(); });
+  }
+  function qlistHTML(probs) {
+    return deck.questions.map(function (q, i) {
+      return '<button type="button" class="qitem" data-act="pick-q" data-i="' + i + '" aria-current="' + (i === editQ) + '"><span class="num">' + (i + 1) + '</span><span class="t"><b>' + (esc(q.prompt) || '<span class="muted">New question</span>') +
+        "</b><small>" + R.TYPES[q.type].name + (probs[i].length ? ' · <span class="warm">⚠ needs work</span>' : "") + "</small></span></button>";
+    }).join("") || '<p class="muted">No questions yet.</p>';
+  }
+  function refreshList() {
+    var probs = deck.questions.map(R.problems);
+    $("#qlist").innerHTML = qlistHTML(probs);
+    var bad = probs.filter(function (p) { return p.length; }).length, pb = $("#probBanner");
+    if (pb) { if (bad) pb.textContent = bad + (bad === 1 ? " question needs" : " questions need") + " a little more before you present. Look for the ⚠ marks."; else pb.remove(); }
+  }
+  var TIMERS_MC = [[0, "No timer"], [15, "15 seconds"], [30, "30 seconds"], [60, "1 minute"], [90, "90 seconds"]];
+  var TIMERS_QZ = [[10, "10 seconds"], [15, "15 seconds"], [20, "20 seconds"], [30, "30 seconds"], [45, "45 seconds"], [60, "1 minute"]];
+  function sel(name, list, val) { return '<select class="input" data-f="' + name + '">' + list.map(function (o) { return '<option value="' + o[0] + '"' + (String(o[0]) === String(val) ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>"; }
+  function renderQEdit() {
+    var box = $("#qedit");
+    if (!deck.questions.length) { box.innerHTML = '<div class="frozen"><h3>Add your first question</h3><p class="muted">Pick “Add a question” on the left.</p></div>'; return; }
+    var q = deck.questions[editQ], T = R.TYPES, h = "";
+    h += '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between"><span class="label">Question ' + (editQ + 1) + " of " + deck.questions.length + '</span><span class="controls">' +
+      '<button type="button" class="btn small" data-act="q-up" ' + (editQ === 0 ? "disabled" : "") + ' aria-label="Move up">↑</button><button type="button" class="btn small" data-act="q-down" ' + (editQ === deck.questions.length - 1 ? "disabled" : "") + ' aria-label="Move down">↓</button>' +
+      '<button type="button" class="btn small" data-act="q-dup">Duplicate</button><button type="button" class="btn small danger" data-act="q-del">Delete</button></span></div>';
+    h += '<fieldset><legend class="sr">Activity type</legend><div class="types">' + Object.keys(T).map(function (k) {
+      return '<button type="button" class="type-btn" data-act="q-type" data-type="' + k + '" aria-pressed="' + (q.type === k) + '"><span class="g">' + T[k].glyph + "</span><span>" + T[k].name + '<br><small class="muted">' + T[k].hint + "</small></span></button>";
+    }).join("") + "</div></fieldset>";
+    h += '<label class="field"><span>Your question</span><textarea class="input" data-f="prompt" rows="2" maxlength="200" style="font:600 22px var(--display)">' + esc(q.prompt) + "</textarea></label>";
+    if (q.options) {
+      var isRank = q.type === "rk", canCorrect = q.type === "mc" || q.type === "qz";
+      h += '<fieldset class="stack-16" style="gap:10px"><legend>' + (isRank ? "Items to rank" : "Answers") + (canCorrect ? (q.type === "qz" ? ' <span class="muted" style="font-weight:600">· mark the correct one</span>' : ' <span class="muted" style="font-weight:600">· marking a correct one is optional</span>') : "") + "</legend>" +
+        q.options.map(function (o, i) {
+          return '<div class="optrow"><span class="letter">' + (isRank ? i + 1 : R.LETTERS[i]) + '</span><input class="input" data-opt="' + i + '" value="' + esc(o) + '" maxlength="80" aria-label="' + (isRank ? "Item " : "Answer ") + (i + 1) + '">' +
+            (canCorrect ? '<label class="check" style="min-height:44px"><input type="radio" name="correct" data-correct="' + i + '"' + (q.correct === i ? " checked" : "") + "> Correct</label>" : "") +
+            '<button type="button" class="btn icon small" data-act="opt-del" data-i="' + i + '" aria-label="Remove ' + (isRank ? "item " : "answer ") + (i + 1) + '"' + (q.options.length <= 2 ? " disabled" : "") + ">✕</button></div>";
+        }).join("") +
+        '<div class="controls">' + (q.options.length < (q.type === "qz" ? 6 : 8) ? '<button type="button" class="btn small" data-act="opt-add" style="border-style:dashed">+ Add ' + (isRank ? "item" : "answer") + "</button>" : "") +
+        (q.type === "mc" && q.correct != null ? '<button type="button" class="btn small" data-act="no-correct">No correct answer</button>' : "") + "</div></fieldset>";
+    }
+    h += '<div class="grid2">';
+    if (q.type === "mc") h += '<label class="check"><input type="checkbox" data-f="multi"' + (q.multi ? " checked" : "") + "> Students can pick more than one</label>" + '<label class="field"><span>Timer</span>' + sel("timer", TIMERS_MC, q.timer || 0) + "</label>";
+    if (q.type === "qz") h += '<label class="field"><span>Time to answer</span>' + sel("timer", TIMERS_QZ, q.timer || 20) + '</label><p class="note" style="align-self:end">Faster correct answers earn more points (500 to 1,000). The leaderboard adds up all quiz questions.</p>';
+    if (q.type === "wc") h += '<label class="field"><span>Words per student</span>' + sel("maxWords", [[1, "1 word"], [2, "Up to 2"], [3, "Up to 3"]], q.maxWords) + '</label><label class="check"><input type="checkbox" data-f="moderate"' + (q.moderate ? " checked" : "") + "> Hold words for my approval before they show</label>";
+    if (q.type === "qa") h += '<label class="check"><input type="checkbox" data-f="moderate"' + (q.moderate ? " checked" : "") + '> Hold questions for my approval before they show</label><p class="note">Students can ask up to 3 questions and upvote each other’s.</p>';
+    if (q.type === "rs") h += '<label class="field"><span>Scale</span>' + sel("scaleMax", [[5, "1 to 5"], [10, "1 to 10"]], q.scaleMax) + '</label><span></span><label class="field"><span>Label for 1</span><input class="input" data-f="lowLabel" value="' + esc(q.lowLabel) + '" maxlength="30"></label><label class="field"><span>Label for ' + q.scaleMax + '</span><input class="input" data-f="highLabel" value="' + esc(q.highLabel) + '" maxlength="30"></label>';
+    if (q.type === "rk") h += '<p class="note">Students put the items in order on their phones. Results show the average place of each item.</p>';
+    h += "</div>";
+    var p = R.problems(q);
+    h += p.length ? '<div class="banner warn">⚠ ' + p.join(" ") + "</div>" : "";
+    box.innerHTML = '<div class="stack-16" style="gap:20px">' + h + "</div>";
+  }
+  function onEditInput(e) {
+    if (view !== "edit" || !e.target.closest("#qedit")) return;
+    var q = deck.questions[editQ], t = e.target, f = t.getAttribute("data-f");
+    if (t.hasAttribute("data-opt")) q.options[+t.getAttribute("data-opt")] = t.value;
+    else if (t.hasAttribute("data-correct")) q.correct = +t.getAttribute("data-correct");
+    else if (f === "multi" || f === "moderate") q[f] = t.checked;
+    else if (f === "timer" || f === "maxWords" || f === "scaleMax") { q[f] = +t.value; if (f === "scaleMax") renderQEdit(); }
+    else if (f) q[f] = t.value;
+    saveDeckSoon(); refreshList();
+    if (e.type === "change" && (t.hasAttribute("data-correct"))) renderQEdit();
+  }
+  app.addEventListener("input", onEditInput);
+  app.addEventListener("change", function (e) { if (e.target.type === "radio" || e.target.tagName === "SELECT" || e.target.type === "checkbox") onEditInput(e); });
+
+  function addQuestion() {
+    var m = PC.modal("Add a question", '<div class="types">' + Object.keys(R.TYPES).map(function (k) {
+      return '<button type="button" class="type-btn" data-new="' + k + '"><span class="g">' + R.TYPES[k].glyph + "</span><span>" + R.TYPES[k].name + '<br><small class="muted">' + R.TYPES[k].hint + "</small></span></button>";
+    }).join("") + "</div>");
+    m.el.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-new]"); if (!b) return;
+      var q = R.blank(b.getAttribute("data-new"));
+      if ((q.type === "wc" || q.type === "qa") && Store.settings().hold) q.moderate = true;
+      deck.questions.splice(editQ + 1, 0, q); editQ = deck.questions.length === 1 ? 0 : editQ + 1;
+      Store.saveDeck(deck); m.close(); renderEdit();
+      var ta = $('#qedit [data-f="prompt"]'); if (ta) ta.focus();
+    });
+  }
+
+  /* =========================================================
+     Live room
+     ========================================================= */
+  var live = null; // { s, keys, conn, srv, ... }
+  var PRESENT_MS = 70000;
+
+  async function startSession(deckId) {
+    var d = Store.deck(deckId);
+    var probs = d.questions.map(R.problems);
+    var badIdx = probs.map(function (p, i) { return p.length ? i + 1 : 0; }).filter(Boolean);
+    if (!d.questions.length) { PC.toast("Add a question first."); return; }
+    if (badIdx.length) {
+      var okGo = await PC.confirm("Some questions aren’t ready", "Question " + badIdx.join(", ") + " still need" + (badIdx.length === 1 ? "s" : "") + " work and will be skipped. Present the rest?", "Present anyway");
+      if (!okGo) return;
+    }
+    var old = PC.store.get("live"); var os = old && Store.session(old);
+    if (os && !os.endedAt) {
+      var end = await PC.confirm("End the open session?", "“" + esc(os.title) + "” (room " + esc(os.code) + ") is still open. Starting a new one will end it. Its results stay in Past sessions.", "End it and start");
+      if (!end) return;
+      os.endedAt = Date.now(); Store.saveSession(os);
+    }
+    var keys = await PC.keys.create();
+    var qs = d.questions.filter(function (q, i) { return !probs[i].length; }).map(function (q) {
+      var c = JSON.parse(JSON.stringify(q));
+      if (c.options) {
+        var keep = [], map = {};
+        c.options.forEach(function (o, i) { if (String(o || "").trim()) { map[i] = keep.length; keep.push(String(o).trim()); } });
+        c.options = keep; if (c.correct != null) c.correct = map[c.correct] != null ? map[c.correct] : null;
+      }
+      c.prompt = String(c.prompt).trim();
+      return c;
+    });
+    var srv = PC.server.current();
+    var s = {
+      id: PC.uid(8), deckId: d.id, title: d.title || "Untitled", code: keys.code, fp: keys.fp,
+      keys: { pub: keys.pub, jwk: keys.jwk }, server: srv.mode === "supabase" && srv.own ? { url: srv.url, key: srv.key } : (srv.mode === "demo" ? "demo" : "site"),
+      startedAt: Date.now(), endedAt: null, qi: 0, questions: qs, status: {}, answers: {}, words: {}, qa: {}, roster: {}, kicked: [], locked: false, showJoin: true
+    };
+    Store.saveSession(s); PC.store.set("live", s.id);
+    go("#live");
+  }
+
+  async function resumeLive() {
+    var id = PC.store.get("live"), s = id && Store.session(id);
+    if (!s || s.endedAt) { PC.store.del("live"); go("#"); return; }
+    if (live && live.s.id === s.id) { renderLive(); return; }
+    if (live) stopLive();
+    var srv = s.server === "demo" ? { mode: "demo" } : s.server === "site" ? (PC.server.site() || { mode: "demo" }) : { mode: "supabase", url: s.server.url, key: s.server.key, own: true };
+    live = { s: s, srv: srv, keys: await PC.keys.load(s.keys), devPub: {}, bucket: {}, status: "connecting", hostStatus: "connecting", lastSent: 0, pending: null, seq: Date.now() };
+    live.conn = PC.connect(srv);
+    live.conn.join(s.code, "teacher", {
+      onMessage: onStudentMessage,
+      onStatus: function (st) { live.status = st; paintConn(); if (st === "SUBSCRIBED") sendState(true); },
+      onHostStatus: function (st) { live.hostStatus = st; paintConn(); }
+    });
+    live.tick = setInterval(tick, 1000);
+    if (!s.status[curQ().id]) openQuestion(s.qi, true);
+    renderLive();
+  }
+  function pauseLiveView() { /* keep the room running while the teacher looks at other screens */ }
+  function stopLive() {
+    if (!live) return;
+    clearInterval(live.tick); clearTimeout(live.pending); live.conn.close(); live = null;
+  }
+  function curQ() { return live.s.questions[live.s.qi]; }
+  function curSt() { var q = curQ(); return live.s.status[q.id] || (live.s.status[q.id] = { open: false }); }
+  var saveSoon = PC.debounce(function () { if (live) Store.saveSession(live.s); }, 800);
+
+  function openQuestion(i, initial) {
+    var s = live.s; s.qi = PC.clamp(i, 0, s.questions.length - 1);
+    var q = curQ(), st = s.status[q.id];
+    if (!st) {
+      st = s.status[q.id] = { open: false, hideResults: !Store.settings().liveResults || q.type === "qz", revealed: false };
+      if (!needsStart(q)) startVoting(st, q);
+    }
+    if (!initial) { sendState(true); saveSoon(); renderLive(); }
+  }
+  // Timed questions wait for the teacher to press Start, so the clock doesn't run while students are still joining
+  function needsStart(q) { return q.type === "qz" || !!q.timer; }
+  function startVoting(st, q) {
+    st.open = true; st.openedAt = Date.now();
+    st.endsAt = q.timer ? Date.now() + q.timer * 1000 : null;
+  }
+  function tick() {
+    if (!live) return;
+    var st = curSt(), now = Date.now();
+    if (st.open && st.endsAt && now >= st.endsAt) { st.open = false; st.endsAt = null; sendState(true); saveSoon(); if (view === "live") renderStage(); }
+    if (view === "live") { paintTimer(); paintCrowd(); }
+    if (now - live.lastSent > 20000) sendState(false); // keep late joiners in sync
+  }
+
+  /* ---------- state sent to phones (signed) ---------- */
+  function present() {
+    var now = Date.now(), r = live.s.roster;
+    return Object.keys(r).filter(function (p) { return now - (r[p].seen || 0) < PRESENT_MS && live.s.kicked.indexOf(p) < 0; });
+  }
+  function buildState() {
+    var s = live.s, q = curQ(), st = curSt(), now = Date.now();
+    var d = { v: ++live.seq, code: s.code, title: s.title, ended: !!s.endedAt, locked: !!s.locked, kicked: s.kicked };
+    var roster = {}; Object.keys(s.roster).forEach(function (p) { var x = s.roster[p]; roster[p] = x.k + "." + x.v + "." + x.l; });
+    d.roster = roster;
+    d.q = { id: q.id, i: s.qi, n: s.questions.length, type: q.type, prompt: q.prompt, open: !!st.open, revealed: !!st.revealed, left: st.open && st.endsAt ? Math.max(0, st.endsAt - now) : null };
+    if (q.options) d.q.options = q.options;
+    if (q.type === "mc") d.q.multi = !!q.multi;
+    if (q.type === "wc") d.q.maxWords = q.maxWords || 1;
+    if (q.type === "rs") { d.q.scaleMax = q.scaleMax; d.q.lowLabel = q.lowLabel; d.q.highLabel = q.highLabel; }
+    if (q.timer) d.q.timer = q.timer;
+    d.q.started = !!st.openedAt;
+    if (q.type === "wc" || q.type === "qa") d.q.moderate = !!q.moderate;
+    if (st.revealed && q.correct != null) d.q.correct = q.correct;
+    if (q.type === "qa") {
+      var list = (s.qa[q.id] || []).filter(function (x) { return x.ok && !x.hidden; })
+        .sort(function (a, b) { return (a.answered - b.answered) || (b.votes.length - a.votes.length) || (a.at - b.at); }).slice(0, 40);
+      d.q.qa = list.map(function (x) { return { id: x.id, text: x.text, n: x.votes.length, a: x.answered ? 1 : 0 }; });
+    }
+    if (q.type === "qz" && st.revealed) {
+      var all = R.leaderboard(s, 0, q.id), mine = {};
+      all.forEach(function (x) { mine[x.pub] = [x.pts, x.rank, all.length]; });
+      var A = s.answers[q.id] || {};
+      Object.keys(A).forEach(function (p) { if (mine[p]) mine[p].push(A[p].pts || 0); });
+      d.q.scores = mine;
+      d.q.top = all.slice(0, 5).map(function (x) { return { b: x.k + "." + x.v + "." + x.l, nick: x.nick, pts: x.pts }; });
+    }
+    return d;
+  }
+  // Throttled: teacher actions go out right away; joins and new questions are batched
+  // so a class of 100 stays under Supabase's free message limits.
+  function sendState(urgent) {
+    if (!live) return;
+    var gap = urgent ? 250 : 2500, wait = Math.max(0, live.lastSent + gap - Date.now());
+    if (live.pending) { if (!urgent) return; clearTimeout(live.pending); }
+    live.pending = setTimeout(async function () {
+      live.pending = null; if (!live) return;
+      live.lastSent = Date.now();
+      var d = JSON.stringify(buildState());
+      try { var sig = await PC.keys.sign(live.keys, d); await live.conn.broadcast({ pk: live.keys.pub, d: d, sig: sig }); }
+      catch (e) { console.warn("broadcast failed", e); }
+    }, wait);
+  }
+
+  /* ---------- messages from phones ---------- */
+  async function pubFor(dev) {
+    if (live.devPub[dev]) return live.devPub[dev];
+    return (live.devPub[dev] = await PC.hashId(dev));
+  }
+  function allow(pub) { // at most 12 messages per 10 seconds per phone
+    var now = Date.now(), b = live.bucket[pub] || (live.bucket[pub] = []);
+    while (b.length && now - b[0] > 10000) b.shift();
+    if (b.length >= 12) return false; b.push(now); return true;
+  }
+  function cleanText(t, max) {
+    t = String(t || "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+    return F.clean(t).text;
+  }
+  async function onStudentMessage(m) {
+    if (!live || !m || typeof m !== "object" || typeof m.dev !== "string" || m.dev.length < 8 || m.dev.length > 64) return;
+    var s = live.s, pub = await pubFor(m.dev);
+    if (s.kicked.indexOf(pub) >= 0 || s.endedAt || !allow(pub)) return;
+    var r = s.roster[pub], now = Date.now(), changed = false;
+    if (m.t === "sync") { sendState(false); return; }
+    if (m.t === "hi") {
+      if (!r && s.locked) { sendState(false); return; }
+      var b = m.b || {}, k = B.ORDER.indexOf(b.k) >= 0 ? b.k : "penguin", l = ["none", "beanie", "sunglasses", "glasses", "beard"].indexOf(b.l) >= 0 ? b.l : "none";
+      var v = PC.clamp(parseInt(b.v, 10) || 0, 0, 3);
+      // Give out a pattern nobody else in the room has for this buddy and look
+      var taken = {}; Object.keys(s.roster).forEach(function (p) { if (p !== pub) { var x = s.roster[p]; if (x.k === k && x.l === l) taken[x.v] = 1; } });
+      if (taken[v]) { for (var i = 0; i < 4; i++) if (!taken[i]) { v = i; break; } }
+      var nick = cleanText(m.nick, 16);
+      if (!r || r.k !== k || r.v !== v || r.l !== l || r.nick !== nick) changed = true;
+      s.roster[pub] = { k: k, v: v, l: l, nick: nick, seen: now, joined: r ? r.joined : now };
+      if (changed) { sendState(false); saveSoon(); paintSoon(); }
+      return;
+    }
+    if (!r) { sendState(false); return; } // must say hi first
+    r.seen = now;
+    if (m.t === "ping") return;
+    if (m.t === "bye") { r.seen = 0; return; }
+    var q = curQ(), st = curSt();
+    if (m.q !== q.id) return;
+    var A = s.answers[q.id] || (s.answers[q.id] = {});
+    if (m.t === "ans") {
+      if (!st.open || (st.endsAt && now > st.endsAt + 1500)) return;
+      var val = m.v, n = (q.options || []).length;
+      if (q.type === "mc") {
+        if (q.multi) { if (!Array.isArray(val)) return; val = val.filter(function (x, i, a) { return Number.isInteger(x) && x >= 0 && x < n && a.indexOf(x) === i; }).slice(0, n); if (!val.length) return; }
+        else if (!Number.isInteger(val) || val < 0 || val >= n) return;
+        A[pub] = val;
+      } else if (q.type === "qz") {
+        if (A[pub] || !Number.isInteger(val) || val < 0 || val >= n) return; // first answer counts
+        var ms = now - (st.openedAt || now);
+        A[pub] = { c: val, ms: ms, pts: R.quizPoints(q, val, ms) };
+      } else if (q.type === "rs") {
+        if (!Number.isInteger(val) || val < 1 || val > (q.scaleMax || 5)) return;
+        A[pub] = val;
+      } else if (q.type === "rk") {
+        if (!Array.isArray(val) || val.length !== n) return;
+        var seen = {}; for (var j = 0; j < n; j++) { if (!Number.isInteger(val[j]) || val[j] < 0 || val[j] >= n || seen[val[j]]) return; seen[val[j]] = 1; }
+        A[pub] = val.slice();
+      } else return;
+      changedResults();
+      return;
+    }
+    if (m.t === "word" && q.type === "wc") {
+      if (!st.open) return;
+      var list = s.words[q.id] || (s.words[q.id] = []);
+      var mine = list.filter(function (w) { return w.pub === pub; });
+      if (mine.length >= (q.maxWords || 1)) return;
+      var w = cleanText(m.w, 25); if (!w) return;
+      list.push({ id: PC.uid(6), pub: pub, text: w, ok: !q.moderate, hidden: false, at: now });
+      changedResults(); if (q.moderate) paintModBadge();
+      return;
+    }
+    if (m.t === "ask" && q.type === "qa") {
+      if (!st.open) return;
+      var qa = s.qa[q.id] || (s.qa[q.id] = []);
+      if (qa.filter(function (x) { return x.pub === pub; }).length >= 3) return;
+      var text = cleanText(m.text, 160); if (text.length < 2) return;
+      qa.push({ id: PC.uid(6), pub: pub, text: text, votes: [], ok: !q.moderate, hidden: false, answered: false, at: now });
+      changedResults(); if (q.moderate) paintModBadge(); else sendState(false);
+      return;
+    }
+    if (m.t === "up" && q.type === "qa") {
+      var item = (s.qa[q.id] || []).filter(function (x) { return x.id === m.id; })[0];
+      if (!item || item.pub === pub) return;
+      var at = item.votes.indexOf(pub);
+      if (m.on && at < 0) item.votes.push(pub); else if (!m.on && at >= 0) item.votes.splice(at, 1); else return;
+      changedResults(); sendState(false);
+    }
+  }
+  var paintSoon = PC.debounce(function () { if (view === "live") { renderResultsArea(); paintCrowd(); refreshDrawer(); } }, 250);
+  function changedResults() { saveSoon(); paintSoon(); }
+
+  /* ---------- live view ---------- */
+  function renderLive() {
+    if (view !== "live" || !live) return;
+    var s = live.s;
+    var joinUrl = PC.joinUrl(s.code, s.fp, live.srv), short = PC.siteBase().replace(/^https?:\/\//, "").replace(/\/$/, "") + "/join";
+    app.innerHTML = topBar('<span class="chip" id="connChip"><span class="dot wait"></span>Connecting…</span>' +
+      '<button type="button" class="btn" data-act="people">People <span class="badge" id="peopleN">0</span></button>' +
+      '<button type="button" class="btn" data-act="moderate">Moderation <span class="badge" id="modN" hidden>0</span></button>' +
+      '<button type="button" class="btn" data-act="more" aria-haspopup="true">More ▾</button>') +
+      '<div class="stage' + (s.showJoin ? "" : " nojoin") + '" id="stage"><section class="q" id="qbox"></section>' +
+      '<aside class="join" aria-label="How to join"><h2 style="font-size:28px">Join the crowd</h2><div class="qr">' + PC.qrSVG(joinUrl) + "</div>" +
+      (live.srv.mode === "supabase" && !live.srv.own ? '<span style="font-weight:600;color:var(--inv-muted)">Scan with your phone camera, or go to</span><span class="join-url">' + esc(short) + "</span>" +
+        '<div class="roomcode"><span class="label">Room code</span><b>' + esc(s.code.replace("-", " ")) + "</b></div>"
+        : '<span style="font-weight:600;color:var(--inv-muted)">Scan with your phone camera to join.</span><div class="roomcode"><span class="label">Room</span><b>' + esc(s.code.replace("-", " ")) + "</b></div>" +
+          (live.srv.mode === "demo" ? '<span class="note" style="color:var(--inv-muted)">Demo mode: open the link in another tab of this browser.</span>' : '<span class="note" style="color:var(--inv-muted)">This room uses your own server, so students need the QR code or link.</span>')) +
+      '<button type="button" class="btn small" data-act="copy-link" style="border-color:var(--inv-muted);color:var(--inv-ink)">Copy join link</button>' +
+      '<div style="margin-top:auto">' + PC.igloo(180) + "</div></aside></div>" + footer();
+    finish(); renderStage(); paintConn(); paintCrowd(); paintModBadge();
+  }
+  function renderStage() {
+    var box = $("#qbox"); if (!box || !live) return;
+    var s = live.s, q = curQ(), st = curSt(), T = R.TYPES[q.type];
+    var ctrl = [];
+    ctrl.push('<button type="button" class="btn" data-act="prev"' + (s.qi === 0 ? " disabled" : "") + '>← Back</button>');
+    if (needsStart(q) && !st.openedAt) ctrl.push('<button type="button" class="btn primary" data-act="start">' + (q.type === "qz" ? "Start the " + (q.timer || 20) + "-second race" : "Start the " + q.timer + "-second timer") + "</button>");
+    else if (!st.revealed) ctrl.push('<button type="button" class="btn" data-act="toggle-open">' + (st.open ? "Close answers" : "Reopen answers") + "</button>");
+    if (q.type !== "qz") ctrl.push('<button type="button" class="btn" data-act="toggle-results">' + (st.hideResults ? "Show results" : "Hide results") + "</button>");
+    if ((q.type === "mc" && q.correct != null) || q.type === "qz") ctrl.push('<button type="button" class="btn' + (st.revealed ? "" : " solid") + '" data-act="reveal"' + (q.type === "qz" && !st.openedAt ? " disabled" : "") + ">" + (st.revealed ? "Hide answer" : "Reveal answer") + "</button>");
+    ctrl.push('<button type="button" class="btn primary" data-act="next">' + (s.qi === s.questions.length - 1 ? "Finish" : "Next →") + "</button>");
+    box.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center"><span class="label">Question ' + (s.qi + 1) + " of " + s.questions.length + " · " + T.name +
+      '</span><span class="chip" id="statusChip"></span></div><h1 class="q-title">' + esc(q.prompt) + "</h1></div>" +
+      '<div id="resultsArea" aria-live="polite"></div><div class="controls" id="ctrl">' + ctrl.join("") + "</div>" +
+      '<div class="crowd-row"><span class="label" id="crowdLabel">In the igloo · 0</span><div class="crowd" id="crowd"></div></div>';
+    renderResultsArea(); paintTimer();
+  }
+  function renderResultsArea() {
+    var el = $("#resultsArea"); if (!el || !live) return;
+    var s = live.s, q = curQ(), st = curSt();
+    var r = R.view(s, q, { controls: true });
+    var n = r.data.total, label = q.type === "wc" ? r.data.entries + (r.data.entries === 1 ? " word" : " words") + " from " + n : q.type === "qa" ? r.data.items.length + (r.data.items.length === 1 ? " question" : " questions") : n + (n === 1 ? " answer" : " answers");
+    if (needsStart(q) && !st.openedAt) el.innerHTML = '<div class="frozen"><h3>Get ready…</h3><p class="muted">Press Start when everyone’s in.' + (q.type === "qz" ? " Faster correct answers score more." : " Students get " + q.timer + " seconds.") + "</p></div>";
+    else if ((st.hideResults && !st.revealed) || (q.type === "qz" && !st.revealed)) el.innerHTML = '<div class="frozen"><h3>' + (q.type === "qz" ? (st.open ? "Answers are coming in…" : "Time’s up!") : "Results are frozen for now") + '</h3><p class="muted" style="font-size:20px"><b style="font-size:40px;font-family:var(--display);color:var(--ink)">' + n + "</b> " + (n === 1 ? "answer" : "answers") + " so far</p></div>";
+    else el.innerHTML = r.html;
+    if (r.data.pending) label += " · " + r.data.pending + " waiting for you";
+    var chip = $("#statusChip");
+    if (chip) chip.innerHTML = '<span class="dot' + (st.open ? "" : " off") + '"></span>' + (st.open ? "Open" : st.revealed ? "Answer shown" : "Closed") + " · " + label + '<span id="timerTxt"></span>';
+  }
+  function paintTimer() {
+    var t = $("#timerTxt"); if (!t || !live) return;
+    var st = curSt(); t.textContent = st.open && st.endsAt ? " · " + Math.max(0, Math.ceil((st.endsAt - Date.now()) / 1000)) + "s" : "";
+  }
+  function paintConn() {
+    var c = $("#connChip"); if (!c || !live) return;
+    var ok = live.status === "SUBSCRIBED" && live.hostStatus === "SUBSCRIBED", bad = /ERROR|TIMED|CLOSED/.test(live.status + live.hostStatus);
+    c.innerHTML = '<span class="dot' + (ok ? "" : bad ? " off" : " wait") + '"></span>' + (ok ? "Live · room " + esc(live.s.code) : bad ? "Reconnecting…" : "Connecting…") + (live.srv.mode === "demo" ? " (demo)" : "");
+    c.title = bad ? "Can't reach the server. Students' answers will arrive once it reconnects. If this keeps up, check Settings > Test connection." : "";
+  }
+  function paintCrowd() {
+    var el = $("#crowd"); if (!el || !live) return;
+    var ids = present(), s = live.s;
+    $("#crowdLabel").textContent = "In the igloo · " + ids.length + (s.locked ? " · locked" : "");
+    var pn = $("#peopleN"); if (pn) pn.textContent = ids.length;
+    var key = ids.join(",") + "|" + ids.map(function (p) { var x = s.roster[p]; return x.k + x.v + x.l; }).join("");
+    if (el.getAttribute("data-key") === key) return;
+    el.setAttribute("data-key", key);
+    var shown = ids.slice(0, 24);
+    el.innerHTML = shown.map(function (p) { var x = s.roster[p]; return B.svg(x.k, x.v, x.l, 44); }).join("") + (ids.length > shown.length ? '<span class="more">+' + (ids.length - shown.length) + "</span>" : "") +
+      (ids.length ? "" : '<span class="muted">Buddies show up here as students join.</span>');
+  }
+  function pendingCount() {
+    if (!live) return 0;
+    var s = live.s, n = 0;
+    Object.keys(s.words).forEach(function (k) { n += s.words[k].filter(function (w) { return !w.ok && !w.hidden; }).length; });
+    Object.keys(s.qa).forEach(function (k) { n += s.qa[k].filter(function (w) { return !w.ok && !w.hidden; }).length; });
+    return n;
+  }
+  function paintModBadge() { var b = $("#modN"); if (!b) return; var n = pendingCount(); b.textContent = n; b.hidden = !n; }
+
+  /* ---------- drawers: moderation & people ---------- */
+  function drawer(title, body) {
+    var old = $(".drawer"); if (old) old.remove();
+    var d = document.createElement("aside"); d.className = "drawer"; d.setAttribute("role", "dialog"); d.setAttribute("aria-label", title);
+    d.innerHTML = '<div class="modal-head"><h2>' + esc(title) + '</h2><button type="button" class="btn icon small" data-act="close-drawer" aria-label="Close">✕</button></div><div class="stack-16" id="drawerBody">' + body + "</div>";
+    document.body.appendChild(d); d.querySelector("button").focus(); return d;
+  }
+  function modBody() {
+    var s = live.s, q = curQ(), pend = [], shown = [];
+    if (q.type === "wc") (s.words[q.id] || []).forEach(function (w) { if (!w.hidden) (w.ok ? shown : pend).push({ id: w.id, text: w.text, kind: "word" }); });
+    if (q.type === "qa") (s.qa[q.id] || []).forEach(function (w) { if (!w.hidden) (w.ok ? shown : pend).push({ id: w.id, text: w.text, kind: "qa" }); });
+    if (q.type !== "wc" && q.type !== "qa") return '<p class="muted">Moderation is for word clouds and Q&amp;A. This question doesn’t take typed answers.</p><p class="note">Swear words and slurs are always replaced with #!*&amp; automatically. Add your own banned words in Settings.</p>';
+    return '<p class="note">Rude words are replaced with #!*&amp; automatically. ' + (q.moderate ? "This question holds new " + (q.type === "wc" ? "words" : "questions") + " for you to approve." : "Turn on “Hold for my approval” in the question editor to check everything first.") + "</p>" +
+      '<span class="label">Waiting for approval · ' + pend.length + "</span>" + (pend.length ? '<button type="button" class="btn small" data-act="approve-all">Approve all</button>' : "") +
+      pend.map(function (x) { return '<div class="mod-item"><span class="t">' + esc(x.text) + '</span><button type="button" class="btn small primary" data-mod="ok" data-k="' + x.kind + '" data-id="' + x.id + '">Show</button><button type="button" class="btn small" data-mod="hide" data-k="' + x.kind + '" data-id="' + x.id + '">Reject</button></div>'; }).join("") +
+      '<span class="label">On screen · ' + shown.length + "</span>" +
+      shown.map(function (x) { return '<div class="mod-item"><span class="t">' + esc(x.text) + '</span><button type="button" class="btn small" data-mod="hide" data-k="' + x.kind + '" data-id="' + x.id + '">Hide</button></div>'; }).join("");
+  }
+  function peopleBody() {
+    var s = live.s, ids = Object.keys(s.roster).filter(function (p) { return s.kicked.indexOf(p) < 0; }), now = Date.now();
+    ids.sort(function (a, b) { return (s.roster[b].seen || 0) - (s.roster[a].seen || 0); });
+    return '<div class="controls"><button type="button" class="btn" data-act="lock">' + (s.locked ? "Unlock room" : "Lock room") + '</button></div><p class="note">' + (s.locked ? "Locked: nobody new can join. Students already in can keep answering." : "Lock the room once everyone’s in, so nobody else can wander in.") + "</p>" +
+      '<span class="label">Students · ' + ids.length + "</span>" +
+      (ids.length ? ids.map(function (p) {
+        var x = s.roster[p], on = now - (x.seen || 0) < PRESENT_MS;
+        return '<div class="person">' + B.svg(x.k, x.v, x.l, 40) + '<span class="t">' + esc(R.buddyName(x)) + '<br><small class="muted">' + (on ? "here" : "away") + '</small></span><button type="button" class="btn small danger" data-kick="' + p + '">Remove</button></div>';
+      }).join("") : '<p class="muted">Nobody yet.</p>') +
+      (s.kicked.length ? '<span class="label">Removed · ' + s.kicked.length + '</span><button type="button" class="btn small" data-act="unkick">Let removed students back in</button>' : "");
+  }
+  function refreshDrawer() {
+    var d = $(".drawer"); if (!d) return;
+    var t = d.getAttribute("aria-label");
+    $("#drawerBody").innerHTML = t === "Moderation" ? modBody() : peopleBody();
+  }
+
+  /* =========================================================
+     Results page
+     ========================================================= */
+  function renderResults(id) {
+    var s = Store.session(id);
+    var hasQuiz = s.questions.some(function (q) { return q.type === "qz"; });
+    app.innerHTML = topBar('<button type="button" class="btn" data-act="home">← Home</button>') +
+      '<main class="page stack-16" style="gap:22px"><div><span class="label">Results</span><h1 style="font-size:38px">' + esc(s.title) + '</h1><p class="muted">' + fmtDate(s.startedAt) + " · room " + esc(s.code) + " · " + Object.keys(s.roster).length + " students" + (s.endedAt ? "" : " · still open") + "</p></div>" +
+      '<div class="card stack-16"><h2 style="font-size:22px">Export</h2><div class="controls"><button type="button" class="btn primary" data-exp="pptx" data-id="' + s.id + '">PowerPoint (a slide per question)</button>' +
+      '<button type="button" class="btn" data-exp="summary" data-id="' + s.id + '">Summary (print or save as PDF)</button><button type="button" class="btn" data-exp="csv" data-id="' + s.id + '">Spreadsheet (CSV)</button></div>' +
+      '<p class="note">Answers are anonymous: exports show buddies and optional nicknames only, never names or emails.</p></div>' +
+      s.questions.map(function (q, i) {
+        var v = R.view(s, q, { reveal: true, limit: 100 });
+        return '<section class="card stack-16"><span class="label">Question ' + (i + 1) + " · " + R.TYPES[q.type].name + " · " + (v.data.total) + (v.data.total === 1 ? " student" : " students") + '</span><h2 style="font-size:28px">' + esc(q.prompt) + "</h2>" + v.html + "</section>";
+      }).join("") +
+      (hasQuiz ? '<section class="card stack-16"><h2>Final quiz leaderboard</h2>' + (R.leaderboard(s, 10).map(function (x) { return '<div class="leader"><span class="rank">' + x.rank + "</span>" + B.svg(x.k, x.v, x.l, 44) + '<span class="who">' + esc(R.buddyName(x)) + '</span><span class="pts">' + x.pts + "</span></div>"; }).join("") || '<p class="muted">No quiz answers were revealed.</p>') + "</section>" : "") +
+      "</main>" + footer();
+    finish();
+  }
+
+  /* =========================================================
+     Settings
+     ========================================================= */
+  function openSettings() {
+    var st = Store.settings(), site = PC.server.site(), own = PC.store.get("ownServer", {}) || {}, choice = PC.store.get("serverChoice", "site");
+    if (choice === "site" && !site) choice = own.url ? "own" : "demo";
+    var m = PC.modal("Settings", '<form class="stack-16" id="setForm" style="gap:22px">' +
+      '<fieldset class="stack-16" style="gap:10px"><legend>Live connection</legend>' +
+      '<label class="check"><input type="radio" name="srv" value="site"' + (choice === "site" ? " checked" : "") + (site ? "" : " disabled") + "> Poller Crowd’s shared server" + (site ? "" : ' <span class="muted">(not set up on this site yet)</span>') + "</label>" +
+      '<label class="check"><input type="radio" name="srv" value="own"' + (choice === "own" ? " checked" : "") + "> My own free Supabase project <span class=\"muted\">(your own limit of 200 students at once)</span></label>" +
+      '<div class="stack-16" id="ownBox" style="gap:10px;padding-left:30px"><label class="field"><span>Project URL</span><input class="input" name="url" placeholder="https://abcdefgh.supabase.co" value="' + esc(own.url || "") + '" autocomplete="off"></label>' +
+      '<label class="field"><span>Publishable key (or legacy anon key)</span><input class="input" name="key" placeholder="sb_publishable_…" value="' + esc(own.key || "") + '" autocomplete="off"></label>' +
+      '<div class="controls"><button type="button" class="btn" data-test>Test connection</button><span id="testMsg" role="status"></span></div>' +
+      '<p class="note">Get these from your Supabase project: Project Settings → API Keys. They’re public keys, safe to use in a web page. <a href="setup.html" target="_blank" rel="noopener">5-minute setup guide</a>.</p></div>' +
+      '<label class="check"><input type="radio" name="srv" value="demo"' + (choice === "demo" ? " checked" : "") + "> Demo mode <span class=\"muted\">(students in other tabs of this browser, for trying things out)</span></label></fieldset>" +
+      '<fieldset class="stack-16" style="gap:6px"><legend>New questions</legend><label class="check"><input type="checkbox" name="hold"' + (st.hold ? " checked" : "") + "> Hold word cloud and Q&amp;A answers for my approval by default</label>" +
+      '<label class="check"><input type="checkbox" name="liveResults"' + (st.liveResults ? " checked" : "") + "> Show results on screen as they come in (you can hide them anytime)</label></fieldset>" +
+      '<label class="field"><span>Extra banned words (one per line or separated by commas)</span><textarea class="input" name="banned" rows="3" placeholder="e.g. a nickname for a rival school">' + esc((st.banned || []).join("\n")) + '</textarea><span class="note">Common swear words and slurs are already blocked. These are added on top, on this computer.</span></label>' +
+      '<fieldset class="stack-16" style="gap:8px"><legend>Your data</legend><p class="note">Question sets and results are saved only in this browser. Past sessions are deleted after ' + (+(PC.cfg.keepSessionsDays || 30)) + ' days. Download sets to back them up or share them.</p><div class="controls"><button type="button" class="btn small danger" data-wipe>Delete all past sessions</button></div></fieldset>' +
+      '<div class="modal-actions"><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn primary">Save</button></div></form>', { wide: true });
+    var f = m.el.querySelector("#setForm");
+    function syncOwn() { m.el.querySelector("#ownBox").style.opacity = f.elements.srv.value === "own" ? 1 : .5; }
+    f.addEventListener("change", syncOwn); syncOwn();
+    m.el.querySelector("[data-test]").addEventListener("click", async function () {
+      var msg = m.el.querySelector("#testMsg"); msg.innerHTML = '<span class="chip"><span class="dot wait"></span>Testing…</span>';
+      var r = await PC.testServer({ url: f.elements.url.value.trim().replace(/\/+$/, ""), key: f.elements.key.value.trim() });
+      msg.innerHTML = r.ok ? '<span class="chip"><span class="dot"></span>Connected! You’re all set.</span>' : '<span class="warm" style="font-weight:700">' + esc(r.why) + "</span>";
+    });
+    m.el.querySelector("[data-wipe]").addEventListener("click", async function () {
+      if (!(await PC.confirm("Delete all past sessions?", "This removes every saved result on this computer. Question sets are kept.", "Delete them", true))) return;
+      Store.sessions().forEach(function (x) { if (x.id !== PC.store.get("live")) Store.delSession(x.id); });
+      PC.toast("Past sessions deleted."); if (view === "home") renderHome();
+    });
+    f.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var url = f.elements.url.value.trim().replace(/\/+$/, ""), key = f.elements.key.value.trim(), srv = f.elements.srv.value;
+      if (srv === "own" && (!/^https:\/\/.+/.test(url) || key.length < 20)) { PC.toast("Add your Project URL (https://…) and key, or pick another option."); return; }
+      PC.store.set("ownServer", url || key ? { url: url, key: key } : null);
+      PC.store.set("serverChoice", srv);
+      Store.saveSettings({ hold: f.elements.hold.checked, liveResults: f.elements.liveResults.checked, banned: f.elements.banned.value.split(/[\n,]+/).map(function (x) { return x.trim(); }).filter(Boolean) });
+      m.close(); PC.toast(live ? "Saved. The open room keeps its current connection." : "Settings saved.");
+      if (view === "home") renderHome();
+    });
+  }
+
+  /* =========================================================
+     Import / export question sets
+     ========================================================= */
+  function downloadFile(name, text, type) {
+    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: type || "application/json" })); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  }
+  window.PCDownload = downloadFile;
+  function fileSafe(s) { return String(s || "poller-crowd").replace(/[\\/:*?"<>|]+/g, "").trim().slice(0, 60) || "poller-crowd"; }
+  function importDeck() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".json,application/json";
+    inp.onchange = async function () {
+      try {
+        var d = JSON.parse(await inp.files[0].text());
+        if (!d || !Array.isArray(d.questions)) throw 0;
+        var qs = d.questions.filter(function (q) { return q && R.TYPES[q.type]; }).map(function (q) {
+          var n = R.blank(q.type); Object.keys(n).forEach(function (k) { if (k !== "id" && q[k] != null) n[k] = q[k]; });
+          n.prompt = String(n.prompt || "").slice(0, 200); if (n.options) n.options = n.options.slice(0, 8).map(function (o) { return String(o || "").slice(0, 80); });
+          return n;
+        });
+        var deckNew = { id: PC.uid(8), title: String(d.title || "Imported set").slice(0, 80), questions: qs };
+        Store.saveDeck(deckNew); PC.toast("Imported “" + deckNew.title + "”."); renderHome();
+      } catch (e) { PC.toast("That file isn’t a Poller Crowd question set."); }
+    };
+    inp.click();
+  }
+
+  /* =========================================================
+     Clicks
+     ========================================================= */
+  document.addEventListener("click", async function (e) {
+    var b = e.target.closest("[data-act],[data-exp],[data-mod],[data-kick],[data-qa-ans],[data-qa-hide]"); if (!b) return;
+    var act = b.getAttribute("data-act"), id = b.getAttribute("data-id");
+    if (b.hasAttribute("data-exp")) { var sx = Store.session(id); if (live && live.s.id === id) sx = live.s; window.PCExport[b.getAttribute("data-exp")](sx); return; }
+    if (live && b.hasAttribute("data-mod")) {
+      var k = b.getAttribute("data-k"), list = (k === "word" ? live.s.words : live.s.qa)[curQ().id] || [];
+      list.forEach(function (x) { if (x.id === b.getAttribute("data-id")) { if (b.getAttribute("data-mod") === "ok") x.ok = true; else x.hidden = true; } });
+      changedResults(); paintModBadge(); refreshDrawer(); if (k === "qa") sendState(false); return;
+    }
+    if (live && b.hasAttribute("data-kick")) {
+      var p = b.getAttribute("data-kick"), x = live.s.roster[p];
+      if (!(await PC.confirm("Remove this student?", "The " + esc(R.buddyName(x)) + " will be sent out of the room and can’t rejoin from that phone. Their answers so far stay in the results.", "Remove", true))) return;
+      live.s.kicked.push(p); sendState(true); saveSoon(); refreshDrawer(); paintCrowd(); return;
+    }
+    if (live && (b.hasAttribute("data-qa-ans") || b.hasAttribute("data-qa-hide"))) {
+      var qid = b.getAttribute("data-qa-ans") || b.getAttribute("data-qa-hide");
+      (live.s.qa[curQ().id] || []).forEach(function (x) { if (x.id === qid) { if (b.hasAttribute("data-qa-ans")) x.answered = !x.answered; else x.hidden = true; } });
+      changedResults(); sendState(false); return;
+    }
+    switch (act) {
+      case "home": go("#"); break;
+      case "settings": openSettings(); break;
+      case "new-deck": var nd = { id: PC.uid(8), title: "New question set", questions: [] }; Store.saveDeck(nd); editQ = 0; go("#edit/" + nd.id); setTimeout(addQuestion, 50); break;
+      case "edit": editQ = 0; go("#edit/" + id); break;
+      case "dup": var dd = Store.deck(id); dd.id = PC.uid(8); dd.title = dd.title + " (copy)"; dd.questions.forEach(function (q) { q.id = PC.uid(8); }); Store.saveDeck(dd); renderHome(); break;
+      case "del-deck": if (await PC.confirm("Delete this question set?", "“" + esc(Store.deck(id).title) + "” will be deleted from this computer. Past results are kept.", "Delete", true)) { Store.delDeck(id); renderHome(); } break;
+      case "export-deck": var de = Store.deck(id); downloadFile(fileSafe(de.title) + ".pollercrowd.json", JSON.stringify({ app: "Poller Crowd", version: 1, title: de.title, questions: de.questions }, null, 1)); break;
+      case "import": importDeck(); break;
+      case "present": if (deck && view === "edit") Store.saveDeck(deck); startSession(id); break;
+      case "resume": go("#live"); break;
+      case "end-old": var oid = PC.store.get("live"), os = Store.session(oid); if (os && await PC.confirm("End this session?", "Students will see that it’s over. Results stay in Past sessions.", "End session")) { os.endedAt = Date.now(); Store.saveSession(os); PC.store.del("live"); renderHome(); } break;
+      case "results": go("#results/" + id); break;
+      case "del-session": if (await PC.confirm("Delete these results?", "This can’t be undone.", "Delete", true)) { if (live && live.s.id === id) stopLive(); Store.delSession(id); renderHome(); } break;
+      case "add-q": addQuestion(); break;
+      case "pick-q": editQ = +b.getAttribute("data-i"); refreshList(); renderQEdit(); break;
+      case "q-up": case "q-down":
+        var j = editQ + (act === "q-up" ? -1 : 1), qs = deck.questions, tmp = qs[editQ]; qs[editQ] = qs[j]; qs[j] = tmp; editQ = j; Store.saveDeck(deck); refreshList(); renderQEdit(); break;
+      case "q-dup": var cp = JSON.parse(JSON.stringify(deck.questions[editQ])); cp.id = PC.uid(8); deck.questions.splice(editQ + 1, 0, cp); editQ++; Store.saveDeck(deck); refreshList(); renderQEdit(); break;
+      case "q-del": if (await PC.confirm("Delete this question?", "", "Delete", true)) { deck.questions.splice(editQ, 1); editQ = Math.max(0, editQ - 1); Store.saveDeck(deck); renderEdit(); } break;
+      case "q-type": var t = b.getAttribute("data-type"), cq = deck.questions[editQ]; if (cq.type !== t) { deck.questions[editQ] = R.convert(cq, t); if ((t === "wc" || t === "qa") && Store.settings().hold) deck.questions[editQ].moderate = true; Store.saveDeck(deck); refreshList(); renderQEdit(); } break;
+      case "opt-add": deck.questions[editQ].options.push(""); Store.saveDeck(deck); renderQEdit(); var ins = $$("#qedit [data-opt]"); ins[ins.length - 1].focus(); break;
+      case "opt-del":
+        var oq = deck.questions[editQ], oi = +b.getAttribute("data-i"); oq.options.splice(oi, 1);
+        if (oq.correct != null) { if (oq.correct === oi) oq.correct = oq.type === "qz" ? 0 : null; else if (oq.correct > oi) oq.correct--; }
+        Store.saveDeck(deck); refreshList(); renderQEdit(); break;
+      case "no-correct": deck.questions[editQ].correct = null; Store.saveDeck(deck); renderQEdit(); break;
+      // ---- live ----
+      case "prev": openQuestion(live.s.qi - 1); break;
+      case "next":
+        if (live.s.qi === live.s.questions.length - 1) endSession();
+        else openQuestion(live.s.qi + 1);
+        break;
+      case "start": startVoting(curSt(), curQ()); sendState(true); saveSoon(); renderStage(); break;
+      case "toggle-open": var so = curSt(); if (so.open) { so.open = false; so.endsAt = null; } else startVoting(so, curQ()); sendState(true); saveSoon(); renderStage(); break;
+      case "toggle-results": curSt().hideResults = !curSt().hideResults; saveSoon(); renderStage(); break;
+      case "reveal": var sr = curSt(); sr.revealed = !sr.revealed; if (sr.revealed) { sr.open = false; sr.endsAt = null; sr.hideResults = false; } sendState(true); saveSoon(); renderStage(); break;
+      case "people": drawer("People", peopleBody()); break;
+      case "moderate": drawer("Moderation", modBody()); break;
+      case "close-drawer": var dr = $(".drawer"); if (dr) dr.remove(); break;
+      case "approve-all": var aq = curQ(); ((aq.type === "wc" ? live.s.words : live.s.qa)[aq.id] || []).forEach(function (x) { if (!x.hidden) x.ok = true; }); changedResults(); paintModBadge(); refreshDrawer(); sendState(false); break;
+      case "lock": live.s.locked = !live.s.locked; sendState(true); saveSoon(); refreshDrawer(); paintCrowd(); break;
+      case "unkick": live.s.kicked = []; sendState(true); saveSoon(); refreshDrawer(); break;
+      case "copy-link": try { await navigator.clipboard.writeText(PC.joinUrl(live.s.code, live.s.fp, live.srv)); PC.toast("Join link copied."); } catch (x2) { PC.toast("Couldn’t copy. Long-press the QR code instead."); } break;
+      case "more": moreMenu(); break;
+    }
+  });
+  function moreMenu() {
+    var s = live.s;
+    var m = PC.modal("Room options", '<div class="stack-16" style="gap:10px">' +
+      '<button type="button" class="btn block" data-m="fs">Full screen (projector)</button>' +
+      '<button type="button" class="btn block" data-m="join">' + (s.showJoin ? "Hide" : "Show") + " the join panel</button>" +
+      '<button type="button" class="btn block" data-m="lock">' + (s.locked ? "Unlock the room" : "Lock the room (no new students)") + "</button>" +
+      '<button type="button" class="btn block" data-m="reset">Clear answers to this question</button>' +
+      '<button type="button" class="btn block" data-m="jump">Jump to a question…</button>' +
+      '<button type="button" class="btn block" data-m="home">Leave this screen (room stays open)</button>' +
+      '<button type="button" class="btn block danger" data-m="end">End the session</button>' +
+      '<p class="note">Keyboard: → next, ← back, Space opens or closes answers, R shows or hides results, F full screen.</p></div>');
+    m.el.addEventListener("click", async function (e) {
+      var b = e.target.closest("[data-m]"); if (!b) return; var a = b.getAttribute("data-m"); m.close();
+      if (a === "fs") toggleFS();
+      if (a === "join") { s.showJoin = !s.showJoin; saveSoon(); $("#stage").classList.toggle("nojoin", !s.showJoin); }
+      if (a === "lock") { s.locked = !s.locked; sendState(true); saveSoon(); paintCrowd(); PC.toast(s.locked ? "Room locked." : "Room unlocked."); }
+      if (a === "reset" && await PC.confirm("Clear answers?", "All answers to this question will be deleted.", "Clear", true)) {
+        var q = curQ(); delete s.answers[q.id]; delete s.words[q.id]; delete s.qa[q.id]; s.status[q.id] = null; delete s.status[q.id]; openQuestion(s.qi);
+      }
+      if (a === "jump") {
+        var jm = PC.modal("Jump to a question", '<div class="qlist">' + s.questions.map(function (q, i) { return '<button type="button" class="qitem" data-j="' + i + '" aria-current="' + (i === s.qi) + '"><span class="num">' + (i + 1) + '</span><span class="t"><b>' + esc(q.prompt) + "</b><small>" + R.TYPES[q.type].name + "</small></span></button>"; }).join("") + "</div>");
+        jm.el.addEventListener("click", function (ev) { var jb = ev.target.closest("[data-j]"); if (jb) { jm.close(); openQuestion(+jb.getAttribute("data-j")); } });
+      }
+      if (a === "home") go("#");
+      if (a === "end") endSession();
+    });
+  }
+  function toggleFS() { if (document.fullscreenElement) document.exitFullscreen(); else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {}); }
+  async function endSession() {
+    if (!(await PC.confirm("End the session?", "Students will see a thank-you screen. You’ll go to the results, where you can export a PowerPoint, summary or spreadsheet.", "End session"))) return;
+    var s = live.s; s.endedAt = Date.now(); Store.saveSession(s);
+    sendState(true);
+    setTimeout(function () { stopLive(); PC.store.del("live"); go("#results/" + s.id); }, 900);
+  }
+  document.addEventListener("keydown", function (e) {
+    if (view !== "live" || !live || e.target.closest("input,textarea,select,[contenteditable]") || $(".modal") || e.metaKey || e.ctrlKey || e.altKey) return;
+    var map = { ArrowRight: "next", ArrowLeft: "prev", " ": "toggle-open", r: "toggle-results", R: "toggle-results" };
+    if (e.key === "f" || e.key === "F") { toggleFS(); return; }
+    var act = map[e.key]; if (!act) return;
+    var btn = $('#ctrl [data-act="' + act + '"]') || (act === "toggle-open" ? $('#ctrl [data-act="start"]') : null);
+    if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+  });
+  // Keep the room's data safe if the tab closes
+  window.addEventListener("pagehide", function () { if (live) Store.saveSession(live.s); });
+
+  route();
+})();

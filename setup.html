@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup guide · Poller Crowd</title>
+<meta name="description" content="Connect Poller Crowd to your own free Supabase project in 5 minutes.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/pollercrowd.css">
+<script src="js/config.js"></script>
+<style>.doc{max-width:780px;margin:0 auto;padding:10px 24px 30px;display:flex;flex-direction:column;gap:16px}.doc h1{font-size:40px}.doc h2{font-size:24px;margin-top:14px}.doc li{margin:6px 0}.doc ol,.doc ul{padding-left:24px;margin:0}.doc code{background:var(--panel2);padding:2px 6px;border-radius:6px;font-size:15px}</style>
+</head>
+<body class="snow">
+<header class="host-top"><a class="brand" href="index.html" id="brand"></a><div class="tools"><div data-theme-btn="seg"></div></div></header>
+<main class="doc">
+<span class="label">Setup guide</span>
+<h1>Use your own free Supabase project</h1>
+<p style="font-size:19px">Poller Crowd works out of the box on this site’s shared connection. If you teach big classes or use it a lot, connect your own free Supabase project. You get your own limit of <b>200 students at once</b>, and nobody else’s classes count against it. It takes about 5 minutes and doesn’t need any code.</p>
+<h2>1. Make a free Supabase account and project</h2>
+<ol>
+<li>Go to <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> and sign up (GitHub or email).</li>
+<li>Click <b>New project</b>. Give it a name like <code>poller-crowd</code>, set any database password (you won’t need it again), and pick the region closest to you.</li>
+<li>Wait a minute or two while it sets up.</li>
+</ol>
+<h2>2. Copy two values</h2>
+<ol>
+<li>In your project, open <b>Project Settings → API Keys</b> (or click <b>Connect</b> at the top).</li>
+<li>Copy the <b>Project URL</b>. It looks like <code>https://abcdefgh.supabase.co</code>.</li>
+<li>Copy the <b>Publishable key</b> (starts with <code>sb_publishable_</code>). Older projects call it the <b>anon public</b> key. Either works.</li>
+</ol>
+<p class="note">These are public keys, made to be used in web pages. Never paste the <b>secret</b> or <b>service_role</b> key anywhere.</p>
+<h2>3. Paste them into Poller Crowd</h2>
+<ol>
+<li>Open the <a href="host.html">teacher screen</a> and click the gear icon (Settings).</li>
+<li>Choose <b>My own free Supabase project</b>, paste the two values, and press <b>Test connection</b>.</li>
+<li>When it says <b>Connected</b>, press Save. That’s it. Your rooms now run on your project, and the QR code tells students’ phones where to connect.</li>
+</ol>
+<h2>Good to know</h2>
+<ul>
+<li><b>Nothing to set up inside Supabase.</b> Poller Crowd only uses Realtime messages, so there are no tables to create. Leave <b>Realtime → Settings → Allow public access</b> turned on (it is by default).</li>
+<li><b>Free projects fall asleep</b> after about a week without use. Before class, run <b>Test connection</b>. If it fails, open the Supabase dashboard, pick your project and press <b>Restore</b>.</li>
+<li>Free accounts can have <b>2 active projects</b>. If you already have two, pause one or reuse an existing project. Poller Crowd won’t touch its data.</li>
+<li>Students joining your rooms need the <b>QR code or link</b> (the room code alone points to the shared connection).</li>
+<li>The free plan allows <b>200 students at once</b> and about 100 messages a second. Poller Crowd batches its updates so a class of 100 stays well inside that.</li>
+</ul>
+</main>
+<footer id="credits"></footer>
+<script src="js/core.js"></script>
+<script>PC.$("#brand").innerHTML = PC.logo(44) + '<span class="stack"><span class="brand-name">Poller Crowd</span><span class="brand-tag">Warm up the lecture</span></span>'; PC.initThemeButtons(); PC.credits(PC.$("#credits"));</script>
+</body>
+</html>

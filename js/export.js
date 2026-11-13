@@ -48,8 +48,8 @@
     var html = '<!doctype html><html lang="en" data-theme="day"><head><meta charset="utf-8"><title>' + e(s.title) + " · Poller Crowd summary</title>" + css +
       "<style>body{background:#fff;color:#0B1F3A;font-size:15px}main{max-width:880px;margin:0 auto;padding:28px 24px}section{break-inside:avoid;page-break-inside:avoid;border-top:2px solid #CFE6F7;padding:22px 0}h1{font-size:34px}h2{font-size:24px;margin:6px 0 16px}" +
       ".label{color:#1E66A6}.cloud{min-height:0}.bar-head{font-size:17px}.bar-num{font-size:20px}.qa-text{font-size:16px}.frozen{min-height:0;padding:18px}.noprint{margin:12px 0 0}@media print{.noprint{display:none}main{padding:0}}</style></head><body><main>" +
-      '<p class="label">Poller Crowd summary</p><h1>' + e(s.title) + '</h1><p class="muted">' + dateStr(s.startedAt) + " · room " + e(s.code) + " · " + people(s) + ' students · answers are anonymous</p><p class="noprint"><button class="btn primary" onclick="print()">Print or save as PDF</button></p>' +
-      body + '<p class="muted" style="margin-top:20px">Made with Poller Crowd · Powered by College Towns</p></main></body></html>';
+      '<p class="label">Poller Crowd summary</p><h1>' + e(s.title) + '</h1><p class="muted">' + dateStr(s.startedAt) + " · room " + e(s.code) + " · " + people(s) + ' students · answers are anonymous</p><p class="noprint controls"><a class="btn" href="' + PC.siteBase() + 'host.html">← Back to Poller Crowd</a><button class="btn primary" onclick="print()">Print or save as PDF</button></p>' +
+      body + '<p class="noprint controls" style="margin-top:20px"><a class="btn primary" href="' + PC.siteBase() + 'host.html">← Back to Poller Crowd</a><button class="btn" onclick="print()">Print or save as PDF</button></p><p class="muted" style="margin-top:20px">Made with Poller Crowd · Powered by College Towns</p></main></body></html>';
     var w = window.open("", "_blank");
     if (w) { w.document.open(); w.document.write(html); w.document.close(); }
     else download(fileSafe(s.title) + " summary " + stamp(s.startedAt) + ".html", html, "text/html");

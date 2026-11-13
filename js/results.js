@@ -13,10 +13,16 @@
   };
   var LETTERS = "ABCDEFGH";
 
+  // Correct answers are a list (older sets stored a single number)
+  function corrects(q) {
+    var c = q && q.correct;
+    if (Array.isArray(c)) return c.filter(function (i) { return Number.isInteger(i); });
+    return Number.isInteger(c) ? [c] : [];
+  }
   function blank(type) {
     var q = { id: window.PC.uid(8), type: type, prompt: "" };
-    if (type === "mc") { q.options = ["", "", "", ""]; q.correct = null; q.multi = false; q.timer = 0; }
-    if (type === "qz") { q.options = ["", "", "", ""]; q.correct = 0; q.timer = 20; }
+    if (type === "mc") { q.options = ["", "", "", ""]; q.correct = []; q.multi = false; q.timer = 0; }
+    if (type === "qz") { q.options = ["", "", "", ""]; q.correct = [0]; q.timer = 20; }
     if (type === "rk") { q.options = ["", "", ""]; }
     if (type === "wc") { q.maxWords = 3; q.moderate = false; }
     if (type === "qa") { q.moderate = false; }
@@ -27,8 +33,10 @@
   function convert(q, type) {
     var n = blank(type); n.id = q.id; n.prompt = q.prompt;
     if (n.options && q.options) n.options = q.options.slice(0, 8).concat(n.options.slice(q.options.length)).slice(0, Math.max(q.options.length, type === "rk" ? 3 : 2));
-    if (type === "qz" && (q.correct == null || q.correct >= n.options.length)) n.correct = 0;
-    if (type === "mc" && q.correct != null) n.correct = q.correct < n.options.length ? q.correct : null;
+    if (type === "mc" || type === "qz") {
+      n.correct = corrects(q).filter(function (i) { return i < n.options.length; });
+      if (type === "qz" && !n.correct.length) n.correct = [0];
+    }
     return n;
   }
   function cleanOptions(q) { return (q.options || []).map(function (o) { return String(o || "").trim(); }).filter(Boolean); }
@@ -37,7 +45,7 @@
     if (!String(q.prompt || "").trim()) p.push("Add the question text.");
     if (q.type === "mc" || q.type === "qz") { if (cleanOptions(q).length < 2) p.push("Add at least two answers."); }
     if (q.type === "rk" && cleanOptions(q).length < 2) p.push("Add at least two items to rank.");
-    if (q.type === "qz" && (q.correct == null || !String((q.options || [])[q.correct] || "").trim())) p.push("Mark the correct answer.");
+    if (q.type === "qz" && !corrects(q).filter(function (i) { return String((q.options || [])[i] || "").trim(); }).length) p.push("Mark at least one correct answer.");
     return p;
   }
 
@@ -56,7 +64,7 @@
       });
       var max = Math.max.apply(null, counts.concat([0]));
       r.rows = opts.map(function (o, i) {
-        return { label: o, letter: LETTERS[i], count: counts[i], pct: r.total ? Math.round(counts[i] / r.total * 100) : 0, lead: counts[i] === max && max > 0, correct: q.correct === i };
+        return { label: o, letter: LETTERS[i], count: counts[i], pct: r.total ? Math.round(counts[i] / r.total * 100) : 0, lead: counts[i] === max && max > 0, correct: corrects(q).indexOf(i) >= 0 };
       });
     }
     if (q.type === "rs") {
@@ -113,7 +121,7 @@
     return limit ? list.slice(0, limit) : list;
   }
   function quizPoints(q, choice, ms) {
-    if (choice !== q.correct) return 0;
+    if (corrects(q).indexOf(choice) < 0) return 0;
     var total = (q.timer || 20) * 1000;
     var left = Math.max(0, total - ms);
     return 500 + Math.round(500 * left / total);
@@ -181,5 +189,5 @@
 
   function icon(k, w) { return TYPES[k] ? TYPES[k].glyph.replace(/width="20" height="20"/, 'width="' + (w || 20) + '" height="' + (w || 20) + '"') : ""; }
   var TROPHY = '<svg class="trophy" viewBox="0 0 64 64" aria-hidden="true"><path d="M21 10H11v5a10 10 0 0 0 10 10M43 10h10v5a10 10 0 0 1-10 10" fill="none" stroke="#1B2440" stroke-width="3.5" stroke-linecap="round"/><path d="M20 6h24v17a12 12 0 0 1-24 0z" fill="#FFB547" stroke="#1B2440" stroke-width="3.5" stroke-linejoin="round"/><path d="M32 12l2.2 4.4 4.8.7-3.5 3.4.8 4.8-4.3-2.3-4.3 2.3.8-4.8-3.5-3.4 4.8-.7z" fill="#FFF4D6"/><path d="M28 35h8v8h-8z" fill="#E8892B" stroke="#1B2440" stroke-width="3.5" stroke-linejoin="round"/><rect x="19" y="43" width="26" height="9" rx="2.5" fill="#FFB547" stroke="#1B2440" stroke-width="3.5"/></svg>';
-  window.PCResults = { TROPHY: TROPHY, icon: icon, TYPES: TYPES, LETTERS: LETTERS, blank: blank, convert: convert, cleanOptions: cleanOptions, problems: problems, compute: compute, view: view, leaderboard: leaderboard, quizPoints: quizPoints, normWord: normWord, buddyName: buddyName };
+  window.PCResults = { corrects: corrects, TROPHY: TROPHY, icon: icon, TYPES: TYPES, LETTERS: LETTERS, blank: blank, convert: convert, cleanOptions: cleanOptions, problems: problems, compute: compute, view: view, leaderboard: leaderboard, quizPoints: quizPoints, normWord: normWord, buddyName: buddyName };
 })();

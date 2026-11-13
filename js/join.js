@@ -175,7 +175,7 @@
         return h;
       }
       h += '<div class="stack-16" style="gap:10px" role="' + (q.multi ? "group" : "radiogroup") + '" aria-label="Answers">' + q.options.map(function (o, i) {
-        var on = draft.indexOf(i) >= 0, right = q.revealed && q.correct === i;
+        var on = draft.indexOf(i) >= 0, right = q.revealed && (q.correct || []).indexOf(i) >= 0;
         return '<button type="button" class="opt" ' + (q.multi ? 'aria-pressed="' + on + '"' : 'role="radio" aria-checked="' + on + '"') + ' data-opt="' + i + '"' + (closed || locked ? " disabled" : "") + (right ? ' style="border-color:var(--live)"' : "") + '><span class="letter' + (right ? " correct" : "") + '">' + LETTERS[i] + "</span><span>" + esc(o) + (right ? " ✓" : "") + "</span></button>";
       }).join("") + "</div>";
       if (q.multi && q.open) h += '<button type="button" class="btn primary big block" data-act="send-multi"' + (draft.length ? "" : " disabled") + ">" + (mine ? "Update my answer" : "Send my answer") + "</button>";
@@ -237,7 +237,7 @@
   }
   function quizResult(q, mine) {
     var s = q.scores && q.scores[me];
-    var right = mine === q.correct;
+    var right = (q.correct || []).indexOf(mine) >= 0;
     var h = '<div class="wait-card" style="gap:6px"><h2 style="font-size:26px">' + (mine == null ? "No answer this time" : right ? "Correct! +" + (s ? s[3] : 0) : "Not this time") + "</h2>";
     if (s) h += '<p class="muted" style="font-size:18px">You have <b style="color:var(--ink)">' + s[0] + "</b> points · place " + s[1] + " of " + s[2] + "</p>";
     return h + "</div>";

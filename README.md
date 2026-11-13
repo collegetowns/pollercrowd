@@ -103,7 +103,7 @@ Before each class, glance at the green **Live** chip at the top of the teacher s
 
 ## Sharing question sets with other teachers
 
-On the teacher home screen, **Download** saves a question set as a small `.pollercrowd.json` file. Email it to a colleague; they press **Import a set**.
+On the teacher home screen, **Download** saves a question set as a small `.pollercrowd` file (it also opens if renamed to `.json`). Email it to a colleague; they press **Import a set**.
 
 ## Updating the bundled libraries
 

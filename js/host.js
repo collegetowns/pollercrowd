@@ -47,6 +47,21 @@
     qs.forEach(function (q) { if (q.image && !PC.images.cached(q.image) && !photoTried[q.image]) { photoTried[q.image] = 1; need = true; } });
     return need;
   }
+  function sampleRace() {
+    var z = function (prompt, options, correct, timer) { return Object.assign(R.blank("qz"), { prompt: prompt, options: options, correct: correct, timer: timer || 20 }); };
+    return {
+      id: PC.uid(8), title: "Sample: Polar Quiz Race", updated: Date.now() + 1, questions: [
+        z("What is the largest kind of penguin?", ["Adélie penguin", "King penguin", "Emperor penguin", "Gentoo penguin"], [2], 15),
+        z("A narwhal’s long “tusk” is actually a…", ["Horn", "Tooth", "Nose", "Antler"], [1]),
+        z("What color is a polar bear’s skin, under its fur?", ["White", "Pink", "Black", "Light brown"], [2]),
+        z("Which of these animals live in the Arctic? (More than one is right!)", ["Polar bear", "Emperor penguin", "Arctic fox", "Walrus"], [0, 2, 3], 25),
+        z("About how much of an iceberg is hidden under the water?", ["About 10%", "About half", "About 75%", "About 90%"], [3]),
+        z("Snowflakes almost always have how many sides or arms?", ["Four", "Five", "Six", "Eight"], [2], 15),
+        z("Which of these places has penguins living in the wild?", ["Alaska", "Greenland", "The Galápagos Islands", "Iceland"], [2]),
+        z("On which continent is the South Pole?", ["Antarctica", "Australia", "South America", "Europe"], [0], 15)
+      ]
+    };
+  }
   function sampleDeck() {
     var q = function (type, o) { return Object.assign(R.blank(type), o); };
     return {
@@ -61,6 +76,7 @@
     };
   }
   if (!PC.store.get("seeded")) { Store.saveDeck(sampleDeck()); PC.store.set("seeded", true); }
+  if (!PC.store.get("sampleRace")) { Store.saveDeck(sampleRace()); PC.store.set("sampleRace", true); }
   // Give the sample set a photo so every feature is there to try
   if (!PC.store.get("samplePhoto")) {
     var sd = Store.decks().filter(function (d) { return d.title === "Sample: Earth Science 101"; })[0], sdeck = sd && Store.deck(sd.id);
@@ -198,14 +214,14 @@
       : '<div class="dropzone" data-act="photo-add" role="button" tabindex="0"><b>+ Add a photo</b><span class="note">Drag one here, paste it, or click to choose. It shows on the big screen next to the question.</span></div>';
     if (q.options) {
       var isRank = q.type === "rk", canCorrect = q.type === "mc" || q.type === "qz";
-      h += '<fieldset class="stack-16" style="gap:10px"><legend>' + (isRank ? "Items to rank" : "Answers") + (canCorrect ? (q.type === "qz" ? ' <span class="muted" style="font-weight:600">· mark the correct one</span>' : ' <span class="muted" style="font-weight:600">· marking a correct one is optional</span>') : "") + "</legend>" +
+      h += '<fieldset class="stack-16" style="gap:10px"><legend>' + (isRank ? "Items to rank" : "Answers") + (canCorrect ? (q.type === "qz" ? ' <span class="muted" style="font-weight:600">· tick every correct answer (one or more)</span>' : ' <span class="muted" style="font-weight:600">· ticking correct answers is optional; you can tick more than one</span>') : "") + "</legend>" +
         q.options.map(function (o, i) {
           return '<div class="optrow"><span class="letter">' + (isRank ? i + 1 : R.LETTERS[i]) + '</span><input class="input" data-opt="' + i + '" value="' + esc(o) + '" maxlength="80" aria-label="' + (isRank ? "Item " : "Answer ") + (i + 1) + '">' +
-            (canCorrect ? '<label class="check" style="min-height:44px"><input type="radio" name="correct" data-correct="' + i + '"' + (q.correct === i ? " checked" : "") + "> Correct</label>" : "") +
+            (canCorrect ? '<label class="check" style="min-height:44px"><input type="checkbox" data-correct="' + i + '"' + (R.corrects(q).indexOf(i) >= 0 ? " checked" : "") + "> Correct</label>" : "") +
             '<button type="button" class="btn icon small" data-act="opt-del" data-i="' + i + '" aria-label="Remove ' + (isRank ? "item " : "answer ") + (i + 1) + '"' + (q.options.length <= 2 ? " disabled" : "") + ">✕</button></div>";
         }).join("") +
         '<div class="controls">' + (q.options.length < (q.type === "qz" ? 6 : 8) ? '<button type="button" class="btn small" data-act="opt-add" style="border-style:dashed">+ Add ' + (isRank ? "item" : "answer") + "</button>" : "") +
-        (q.type === "mc" && q.correct != null ? '<button type="button" class="btn small" data-act="no-correct">No correct answer</button>' : "") + "</div></fieldset>";
+        (q.type === "mc" && R.corrects(q).length ? '<button type="button" class="btn small" data-act="no-correct">Clear correct answers</button>' : "") + "</div></fieldset>";
     }
     h += '<div class="grid2">';
     if (q.type === "mc") h += '<label class="check"><input type="checkbox" data-f="multi"' + (q.multi ? " checked" : "") + "> Students can pick more than one</label>" + '<label class="field"><span>Timer</span>' + sel("timer", TIMERS_MC, q.timer || 0) + "</label>";
@@ -224,7 +240,11 @@
     if (view !== "edit" || !e.target.closest("#qedit")) return;
     var q = deck.questions[editQ], t = e.target, f = t.getAttribute("data-f");
     if (t.hasAttribute("data-opt")) q.options[+t.getAttribute("data-opt")] = t.value;
-    else if (t.hasAttribute("data-correct")) q.correct = +t.getAttribute("data-correct");
+    else if (t.hasAttribute("data-correct")) {
+      var ci = +t.getAttribute("data-correct"), cs = R.corrects(q).filter(function (x) { return x !== ci; });
+      if (t.checked) cs.push(ci);
+      q.correct = cs.sort(function (a, b) { return a - b; });
+    }
     else if (f === "multi" || f === "moderate") q[f] = t.checked;
     else if (f === "timer" || f === "maxWords" || f === "scaleMax") { q[f] = +t.value; if (f === "scaleMax") renderQEdit(); }
     else if (f) q[f] = t.value;
@@ -336,7 +356,8 @@
       if (c.options) {
         var keep = [], map = {};
         c.options.forEach(function (o, i) { if (String(o || "").trim()) { map[i] = keep.length; keep.push(String(o).trim()); } });
-        c.options = keep; if (c.correct != null) c.correct = map[c.correct] != null ? map[c.correct] : null;
+        c.options = keep;
+        if (c.type === "mc" || c.type === "qz") c.correct = R.corrects(c).map(function (i) { return map[i]; }).filter(function (i) { return i != null; });
       }
       c.prompt = String(c.prompt).trim();
       return c;
@@ -420,7 +441,7 @@
     if (q.image) d.q.photo = 1;
     d.q.started = !!st.openedAt;
     if (q.type === "wc" || q.type === "qa") d.q.moderate = !!q.moderate;
-    if (st.revealed && q.correct != null) d.q.correct = q.correct;
+    if (st.revealed && R.corrects(q).length) d.q.correct = R.corrects(q);
     if (q.type === "qa") {
       var list = (s.qa[q.id] || []).filter(function (x) { return x.ok && !x.hidden; })
         .sort(function (a, b) { return (a.answered - b.answered) || (b.votes.length - a.votes.length) || (a.at - b.at); }).slice(0, 40);
@@ -578,7 +599,7 @@
     if (needsStart(q) && !st.openedAt) ctrl.push('<button type="button" class="btn primary" data-act="start">' + (q.type === "qz" ? "Start the " + (q.timer || 20) + "-second race" : "Start the " + q.timer + "-second timer") + "</button>");
     else if (!st.revealed) ctrl.push('<button type="button" class="btn" data-act="toggle-open">' + (st.open ? "Close answers" : "Reopen answers") + "</button>");
     if (q.type !== "qz") ctrl.push('<button type="button" class="btn" data-act="toggle-results">' + (st.hideResults ? "Show results" : "Hide results") + "</button>");
-    if ((q.type === "mc" && q.correct != null) || q.type === "qz") ctrl.push('<button type="button" class="btn' + (st.revealed ? "" : " solid") + '" data-act="reveal"' + (q.type === "qz" && !st.openedAt ? " disabled" : "") + ">" + (st.revealed ? "Hide answer" : "Reveal answer") + "</button>");
+    if ((q.type === "mc" && R.corrects(q).length) || q.type === "qz") ctrl.push('<button type="button" class="btn' + (st.revealed ? "" : " solid") + '" data-act="reveal"' + (q.type === "qz" && !st.openedAt ? " disabled" : "") + ">" + (st.revealed ? "Hide answer" : "Reveal answer") + "</button>");
     ctrl.push('<button type="button" class="btn primary" data-act="next">' + (s.qi === s.questions.length - 1 ? (hasQuiz(s) && !s.podiumShown ? "Show the podium →" : "Finish") : "Next →") + "</button>");
     box.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center"><span class="label">Question ' + (s.qi + 1) + " of " + s.questions.length + " · " + T.name +
       '</span><span class="chip" id="statusChip"></span></div><h1 class="q-title">' + esc(q.prompt) + "</h1></div>" +
@@ -684,6 +705,7 @@
           (im ? '<img class="photo-result" src="' + im + '" alt="' + esc(q.imageAlt || "Photo for this question") + '">' : "") + v.html + "</section>";
       }).join("") +
       (hasQuiz ? '<section class="card stack-16"><h2>Final quiz leaderboard</h2>' + (R.leaderboard(s, 10).map(function (x) { return '<div class="leader"><span class="rank">' + x.rank + "</span>" + B.svg(x.k, x.v, x.l, 44) + '<span class="who">' + esc(R.buddyName(x)) + '</span><span class="pts">' + x.pts + "</span></div>"; }).join("") || '<p class="muted">No quiz answers were revealed.</p>') + "</section>" : "") +
+      '<div class="controls" style="justify-content:center;padding:8px 0 4px"><button type="button" class="btn primary big" data-act="home">← Back to Poller Crowd home</button></div>' +
       "</main>" + footer();
     finish();
   }
@@ -743,7 +765,7 @@
   window.PCDownload = downloadFile;
   function fileSafe(s) { return String(s || "poller-crowd").replace(/[\\/:*?"<>|]+/g, "").trim().slice(0, 60) || "poller-crowd"; }
   function importDeck() {
-    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".json,application/json";
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".pollercrowd,.json,application/json,text/plain";
     inp.onchange = async function () {
       try {
         var d = JSON.parse(await inp.files[0].text());
@@ -795,7 +817,7 @@
       case "export-deck":
         var de = Store.deck(id); await PC.images.preload(de.questions);
         var pics = {}; de.questions.forEach(function (q) { if (q.image && PC.images.cached(q.image)) pics[q.image] = PC.images.cached(q.image); });
-        downloadFile(fileSafe(de.title) + ".pollercrowd.json", JSON.stringify({ app: "Poller Crowd", version: 1, title: de.title, questions: de.questions, images: pics }, null, 1)); break;
+        downloadFile(fileSafe(de.title) + ".pollercrowd", JSON.stringify({ app: "Poller Crowd", version: 1, title: de.title, questions: de.questions, images: pics }, null, 1)); break;
       case "import": importDeck(); break;
       case "present": if (deck && view === "edit") Store.saveDeck(deck); startSession(id); break;
       case "resume": go("#live"); break;
@@ -812,13 +834,16 @@
       case "opt-add": deck.questions[editQ].options.push(""); Store.saveDeck(deck); renderQEdit(); var ins = $$("#qedit [data-opt]"); ins[ins.length - 1].focus(); break;
       case "opt-del":
         var oq = deck.questions[editQ], oi = +b.getAttribute("data-i"); oq.options.splice(oi, 1);
-        if (oq.correct != null) { if (oq.correct === oi) oq.correct = oq.type === "qz" ? 0 : null; else if (oq.correct > oi) oq.correct--; }
+        if (oq.type === "mc" || oq.type === "qz") {
+          oq.correct = R.corrects(oq).filter(function (x) { return x !== oi; }).map(function (x) { return x > oi ? x - 1 : x; });
+          if (oq.type === "qz" && !oq.correct.length) oq.correct = [0];
+        }
         Store.saveDeck(deck); refreshList(); renderQEdit(); break;
       case "photo-add": pickPhoto(); break;
       case "q-done": questionDone(); break;
       case "photo-del": delete deck.questions[editQ].image; delete deck.questions[editQ].imageAlt; Store.saveDeck(deck); renderQEdit(); break;
       case "photo-zoom": var zi = $(".q-media img"); if (zi) PC.modal(curQ().prompt, '<img src="' + zi.src + '" alt="' + esc(zi.alt) + '" style="width:100%;border-radius:16px;display:block">', { wide: true }); break;
-      case "no-correct": deck.questions[editQ].correct = null; Store.saveDeck(deck); renderQEdit(); break;
+      case "no-correct": deck.questions[editQ].correct = []; Store.saveDeck(deck); renderQEdit(); break;
       // ---- live ----
       case "prev": openQuestion(live.s.qi - 1); break;
       case "next":

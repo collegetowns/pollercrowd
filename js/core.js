@@ -9,6 +9,11 @@
   "use strict";
   var CFG = window.POLLER_CROWD_CONFIG || {};
   var PC = {};
+  // Rooms need the browser's secure features, which only work on https:// pages
+  if (location.protocol === "http:" && !/^(localhost|127\.|\[::1\])/.test(location.hostname)) {
+    location.replace("https://" + location.host + location.pathname + location.search + location.hash);
+  }
+  PC.secure = !!(window.isSecureContext && window.crypto && crypto.subtle);
 
   /* ---------- small helpers ---------- */
   PC.esc = function (s) {
@@ -363,6 +368,60 @@
     gs.setAttribute("data-goatcounter", "https://" + CFG.goatcounterCode + ".goatcounter.com/count");
     document.head.appendChild(gs);
   }
+
+  /* ---------- photos for questions (kept in this browser's IndexedDB, not localStorage) ---------- */
+  var dbp = null, imgCache = {};
+  function idb() {
+    if (!dbp) dbp = new Promise(function (ok, fail) {
+      var r = indexedDB.open("pollercrowd", 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore("images"); };
+      r.onsuccess = function () { ok(r.result); }; r.onerror = function () { fail(r.error); };
+    });
+    return dbp;
+  }
+  function tx(mode, fn) { return idb().then(function (db) { return new Promise(function (ok, fail) { var t = db.transaction("images", mode), st = t.objectStore("images"), res = fn(st); t.oncomplete = function () { ok(res && res.result); }; t.onerror = function () { fail(t.error); }; }); }); }
+  PC.images = {
+    // Shrinks a photo to at most 1600px and saves it; returns its id
+    add: function (file) {
+      return new Promise(function (ok, fail) {
+        var url = URL.createObjectURL(file), img = new Image();
+        img.onload = function () {
+          var max = 1600, sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+          var c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+          var g = c.getContext("2d"); g.fillStyle = "#FFFFFF"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          PC.images.save(c.toDataURL("image/jpeg", 0.85)).then(ok, fail);
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); fail(new Error("not an image")); };
+        img.src = url;
+      });
+    },
+    save: function (dataUrl, id) {
+      id = id || "img_" + PC.uid(9);
+      imgCache[id] = dataUrl;
+      return tx("readwrite", function (st) { return st.put(dataUrl, id); }).then(function () { return id; });
+    },
+    cached: function (id) { return id ? imgCache[id] : null; },
+    get: function (id) {
+      if (!id) return Promise.resolve(null);
+      if (imgCache[id]) return Promise.resolve(imgCache[id]);
+      return tx("readonly", function (st) { return st.get(id); }).then(function (v) { if (v) imgCache[id] = v; return v || null; }).catch(function () { return null; });
+    },
+    // Load every photo used by these questions; resolves once they're ready to draw
+    preload: function (questions) { return Promise.all((questions || []).map(function (q) { return PC.images.get(q.image); })); },
+    keepOnly: function (ids) {
+      Object.keys(imgCache).forEach(function (k) { ids[k] = 1; }); // never remove photos added or used during this visit
+      return tx("readwrite", function (st) {
+        var r = st.openCursor(); r.onsuccess = function () { var c = r.result; if (!c) return; if (!ids[c.key]) c.delete(); c.continue(); };
+      }).catch(function () {});
+    }
+  };
+
+  // If something goes wrong, say so instead of failing silently
+  window.addEventListener("unhandledrejection", function (e) {
+    console.error(e.reason);
+    if (PC.toast) PC.toast("Something went wrong: " + ((e.reason && e.reason.message) || e.reason || "unknown error") + ". Try reloading the page.", 6000);
+  });
 
   PC.cfg = CFG;
   window.PC = PC;

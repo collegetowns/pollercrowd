@@ -125,6 +125,14 @@ legend { padding: 0; margin-bottom: 8px; font-weight: 800; }
 .leader .rank { font-family: var(--display); font-size: 26px; width: 36px; text-align: center; color: var(--warm-text); }
 .leader .who { flex: 1; font-weight: 800; font-size: 20px; }
 .leader .pts { font-family: var(--display); font-size: 24px; }
+.q-body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 28px; align-items: start; }
+@media (max-width: 1000px) { .q-body { grid-template-columns: 1fr; } }
+.q-media { margin: 0; }
+.photo-btn { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.q-media img { display: block; width: 100%; max-height: 52vh; object-fit: contain; border-radius: 18px; background: var(--panel2); }
+.photo-edit { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; padding: 14px; border-radius: 16px; background: var(--panel2); }
+.photo-thumb { width: 220px; max-height: 160px; object-fit: cover; border-radius: 12px; background: var(--bg); }
+.photo-result { display: block; max-width: 100%; max-height: 320px; border-radius: 16px; }
 .quiz-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px 32px; align-items: start; }
 .quiz-split .bars { gap: 10px; }
 .quiz-split .track { height: 18px; }

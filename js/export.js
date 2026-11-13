@@ -37,7 +37,9 @@
     var e = PC.esc;
     var body = s.questions.map(function (q, i) {
       var v = R.view(s, q, { reveal: true, limit: 50 });
-      return '<section><p class="label">Question ' + (i + 1) + " · " + R.TYPES[q.type].name + " · " + v.data.total + (v.data.total === 1 ? " student" : " students") + "</p><h2>" + e(q.prompt) + "</h2>" + v.html + "</section>";
+      var im = q.image && PC.images.cached(q.image);
+      return '<section><p class="label">Question ' + (i + 1) + " · " + R.TYPES[q.type].name + " · " + v.data.total + (v.data.total === 1 ? " student" : " students") + "</p><h2>" + e(q.prompt) + "</h2>" +
+        (im ? '<img src="' + im + '" alt="' + e(q.imageAlt || "Photo for this question") + '" style="display:block;max-width:100%;max-height:300px;border-radius:12px;margin:0 0 16px">' : "") + v.html + "</section>";
     }).join("");
     var lb = R.leaderboard(s, 10);
     if (lb.length) body += "<section><h2>Final quiz leaderboard</h2>" + lb.map(function (x) { return '<div class="leader"><span class="rank">' + x.rank + "</span>" + B.svg(x.k, x.v, x.l, 40) + '<span class="who">' + e(R.buddyName(x)) + '</span><span class="pts">' + x.pts + "</span></div>"; }).join("") + "</section>";
@@ -91,8 +93,10 @@
     });
     return c.toDataURL("image/png");
   }
+  function imgSize(src) { return new Promise(function (ok) { var i = new Image(); i.onload = function () { ok([i.naturalWidth, i.naturalHeight]); }; i.onerror = function () { ok([4, 3]); }; i.src = src; }); }
   async function pptx(s) {
     PC.toast("Making your PowerPoint…", 8000);
+    await PC.images.preload(s.questions);
     try { await loadPptx(); } catch (e) { PC.toast("Couldn’t load the PowerPoint maker. Check your connection and try again."); return; }
     var day = PC.theme.get() === "day";
     var C = day ? { bg: "EEF6FD", panel: "FFFFFF", panel2: "DCEEFB", ink: "0B1F3A", muted: "3E5F86", label: "1E66A6", glacier: "3A97DA", warm: "FFB547", warmText: "A85A06", live: "0E7A48" }
@@ -124,8 +128,15 @@
       var q = s.questions[i], r = R.compute(s, q);
       var sl = base("Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + r.total + (r.total === 1 ? " student" : " students"));
       sl.addText(q.prompt, { x: 0.6, y: 0.75, w: 12.1, h: 1.1, fontFace: H, fontSize: 30, bold: true, color: C.ink, valign: "top", fit: "shrink" });
-      var area = { x: 0.6, y: 2.0, w: 12.1, h: 4.8 };
+      var area = { x: 0.6, y: 2.0, w: 12.1, h: 4.8 }, photo = q.image && PC.images.cached(q.image);
+      if (photo) {
+        // photo on the left, results on the right
+        var sz = await imgSize(photo), bw = 5.4, bh = 4.6, k = Math.min(bw / sz[0], bh / sz[1]), pw = sz[0] * k, ph = sz[1] * k;
+        sl.addImage({ data: photo, x: 0.6 + (bw - pw) / 2, y: 2.0 + (bh - ph) / 2, w: pw, h: ph, altText: q.imageAlt || "" });
+        area = { x: 6.3, y: 2.0, w: 6.4, h: 4.8 };
+      }
       if (!r.total) { sl.addText("No responses", { x: area.x, y: 3.6, w: area.w, h: 0.8, fontFace: H, fontSize: 28, color: C.muted, align: "center" }); continue; }
+
       if (q.type === "mc" || q.type === "qz") {
         sl.addChart(p.ChartType.bar, [{ name: "Votes", labels: r.rows.map(function (x) { return x.letter + ". " + x.label + (x.correct ? "  ✓" : ""); }), values: r.rows.map(function (x) { return x.count; }) }],
           Object.assign({}, area, { barDir: "bar", catAxisOrientation: "maxMin", chartColors: r.rows.map(function (x) { return x.correct ? C.live : x.lead && q.correct == null ? C.warm : C.glacier; }), showValue: true, dataLabelColor: C.ink, dataLabelFontSize: 16, dataLabelFontFace: BODY,
@@ -135,25 +146,27 @@
         }
       }
       if (q.type === "rs") {
+        var rw = photo ? area.w : 8.6;
         sl.addChart(p.ChartType.bar, [{ name: "Ratings", labels: r.counts.map(function (_, j) { return String(j + 1); }), values: r.counts }],
-          { x: 0.6, y: 2.0, w: 8.6, h: 4.6, barDir: "col", chartColors: [C.glacier], showValue: true, dataLabelColor: C.ink, dataLabelFontSize: 16, catAxisLabelColor: C.ink, catAxisLabelFontSize: 18, valAxisHidden: true, valGridLine: { style: "none" }, barGapWidthPct: 40, showLegend: false });
-        sl.addText([{ text: "Average\n", options: { fontSize: 16, bold: true, color: C.label } }, { text: r.avg.toFixed(1), options: { fontSize: 64, bold: true, color: C.ink, fontFace: H } }, { text: "\nout of " + r.max, options: { fontSize: 16, color: C.muted } }],
+          { x: area.x, y: photo ? 2.7 : 2.0, w: rw, h: photo ? 3.9 : 4.6, barDir: "col", chartColors: [C.glacier], showValue: true, dataLabelColor: C.ink, dataLabelFontSize: 16, catAxisLabelColor: C.ink, catAxisLabelFontSize: 18, valAxisHidden: true, valGridLine: { style: "none" }, barGapWidthPct: 40, showLegend: false });
+        if (photo) sl.addText("Average " + r.avg.toFixed(1) + " out of " + r.max, { x: area.x, y: 2.0, w: area.w, h: 0.6, fontFace: H, fontSize: 24, bold: true, color: C.ink });
+        else sl.addText([{ text: "Average\n", options: { fontSize: 16, bold: true, color: C.label } }, { text: r.avg.toFixed(1), options: { fontSize: 64, bold: true, color: C.ink, fontFace: H } }, { text: "\nout of " + r.max, options: { fontSize: 16, color: C.muted } }],
           { x: 9.6, y: 2.4, w: 3.1, h: 2.6, fontFace: BODY, align: "center", valign: "middle", fill: { color: C.panel2 } });
-        sl.addText("1 = " + (q.lowLabel || "") + "    " + r.max + " = " + (q.highLabel || ""), { x: 0.6, y: 6.55, w: 8.6, h: 0.35, fontFace: BODY, fontSize: 12, color: C.muted });
+        sl.addText("1 = " + (q.lowLabel || "") + "    " + r.max + " = " + (q.highLabel || ""), { x: area.x, y: 6.55, w: rw, h: 0.35, fontFace: BODY, fontSize: 12, color: C.muted });
       }
       if (q.type === "rk") {
         var rows = [[{ text: "Place", options: { bold: true, color: C.label } }, { text: "Item", options: { bold: true, color: C.label } }, { text: "Average place", options: { bold: true, color: C.label } }]]
           .concat(r.rows.map(function (x, j) { return [String(j + 1), x.label, x.avg.toFixed(1)]; }));
-        sl.addTable(rows, { x: 0.6, y: 2.1, w: 12.1, colW: [1.4, 8.2, 2.5], fontFace: BODY, fontSize: 20, color: C.ink, fill: { color: C.panel }, border: { type: "solid", pt: 1, color: C.panel2 }, rowH: 0.6 });
+        sl.addTable(rows, { x: area.x, y: 2.1, w: area.w, colW: photo ? [1.0, 3.6, 1.8] : [1.4, 8.2, 2.5], fontFace: BODY, fontSize: 20, color: C.ink, fill: { color: C.panel }, border: { type: "solid", pt: 1, color: C.panel2 }, rowH: 0.6 });
       }
       if (q.type === "wc") {
         var img = await cloudPng(r.words, { ink: hex("ink"), label: hex("label"), glacier: hex("glacier"), muted: hex("muted"), warm: hex("warmText") });
-        sl.addImage({ data: img, x: 0.6, y: 2.0, w: 12.1, h: 12.1 * 760 / 1600 });
+        sl.addImage({ data: img, x: area.x, y: 2.0, w: area.w, h: area.w * 760 / 1600 });
       }
       if (q.type === "qa") {
         var qrows = [[{ text: "Votes", options: { bold: true, color: C.label } }, { text: "Question", options: { bold: true, color: C.label } }]]
           .concat(r.items.slice(0, 9).map(function (x) { return [String(x.votes), x.text + (x.answered ? "  (answered)" : "")]; }));
-        sl.addTable(qrows, { x: 0.6, y: 2.0, w: 12.1, colW: [1.3, 10.8], fontFace: BODY, fontSize: 16, color: C.ink, fill: { color: C.panel }, border: { type: "solid", pt: 1, color: C.panel2 } });
+        sl.addTable(qrows, { x: area.x, y: 2.0, w: area.w, colW: photo ? [1.0, 5.4] : [1.3, 10.8], fontFace: BODY, fontSize: 16, color: C.ink, fill: { color: C.panel }, border: { type: "solid", pt: 1, color: C.panel2 } });
         if (r.items.length > 9) sl.addText("+ " + (r.items.length - 9) + " more in the spreadsheet export", { x: 0.6, y: 6.55, w: 8, h: 0.35, fontFace: BODY, fontSize: 12, color: C.muted });
       }
     }

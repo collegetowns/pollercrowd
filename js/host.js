@@ -40,6 +40,13 @@
     Store.sessions().forEach(function (x) { if (x.endedAt && x.endedAt < cut) Store.delSession(x.id); });
   })();
 
+  // Load each photo at most once (a missing photo must not cause endless redraws)
+  var photoTried = {};
+  function needPhotos(qs) {
+    var need = false;
+    qs.forEach(function (q) { if (q.image && !PC.images.cached(q.image) && !photoTried[q.image]) { photoTried[q.image] = 1; need = true; } });
+    return need;
+  }
   function sampleDeck() {
     var q = function (type, o) { return Object.assign(R.blank(type), o); };
     return {
@@ -54,6 +61,34 @@
     };
   }
   if (!PC.store.get("seeded")) { Store.saveDeck(sampleDeck()); PC.store.set("seeded", true); }
+  // Give the sample set a photo so every feature is there to try
+  if (!PC.store.get("samplePhoto")) {
+    var sd = Store.decks().filter(function (d) { return d.title === "Sample: Earth Science 101"; })[0], sdeck = sd && Store.deck(sd.id);
+    var wq = sdeck && sdeck.questions.filter(function (q) { return q.type === "wc" && !q.image; })[0];
+    if (wq) {
+      var c = document.createElement("canvas"); c.width = 1200; c.height = 800; var g = c.getContext("2d");
+      var sky = g.createLinearGradient(0, 0, 0, 800); sky.addColorStop(0, "#050B1E"); sky.addColorStop(0.45, "#1E4E9C"); sky.addColorStop(0.8, "#7FC4F2"); sky.addColorStop(1, "#D8F0FF");
+      g.fillStyle = sky; g.fillRect(0, 0, 1200, 800);
+      g.fillStyle = "#FFFFFF"; for (var i = 0; i < 70; i++) { g.globalAlpha = Math.random() * 0.8; g.beginPath(); g.arc(Math.random() * 1200, Math.random() * 260, Math.random() * 2 + 0.5, 0, 7); g.fill(); }
+      g.globalAlpha = 1; g.fillStyle = "#FFE7A3"; g.beginPath(); g.arc(950, 300, 60, 0, 7); g.fill();
+      g.fillStyle = "rgba(255,255,255,.85)"; [[260, 470, 90], [340, 450, 70], [420, 480, 80], [760, 520, 70], [830, 505, 90]].forEach(function (p) { g.beginPath(); g.ellipse(p[0], p[1], p[2], p[2] * 0.42, 0, 0, 7); g.fill(); });
+      g.fillStyle = "#2E7D5B"; g.beginPath(); g.ellipse(600, 1650, 1400, 1000, 0, 0, 7); g.fill();
+      g.fillStyle = "#3A97DA"; g.beginPath(); g.ellipse(250, 790, 300, 60, 0, 0, 7); g.fill();
+      PC.images.save(c.toDataURL("image/jpeg", 0.85)).then(function (id) {
+        var fresh = Store.deck(sd.id); if (!fresh) return;
+        fresh.questions.forEach(function (q) { if (q.id === wq.id && !q.image) { q.image = id; q.imageAlt = "Drawing of the sky above the Earth, from starry space down to blue sky and clouds"; } });
+        Store.saveDeck(fresh); PC.store.set("samplePhoto", true);
+        if (view === "home") renderHome(); else if (view === "edit" && editId === sd.id) renderEdit();
+      });
+    } else PC.store.set("samplePhoto", true);
+  }
+  // Delete photos no question set or session uses any more
+  setTimeout(function tidyPhotos() {
+    var ids = {};
+    Store.decks().forEach(function (d) { var x = Store.deck(d.id); if (x) x.questions.forEach(function (q) { if (q.image) ids[q.image] = 1; }); });
+    Store.sessions().forEach(function (d) { var x = Store.session(d.id); if (x) x.questions.forEach(function (q) { if (q.image) ids[q.image] = 1; }); });
+    PC.images.keepOnly(ids);
+  }, 20000);
 
   /* =========================================================
      Router
@@ -116,6 +151,7 @@
   var deck = null, saveDeckSoon = PC.debounce(function () { if (deck) Store.saveDeck(deck); }, 500);
   function renderEdit() {
     deck = Store.deck(editId);
+    if (needPhotos(deck.questions)) PC.images.preload(deck.questions).then(function () { if (view === "edit") renderEdit(); });
     if (editQ >= deck.questions.length) editQ = Math.max(0, deck.questions.length - 1);
     var allProblems = deck.questions.map(R.problems);
     var bad = allProblems.filter(function (p) { return p.length; }).length;
@@ -154,6 +190,10 @@
       return '<button type="button" class="type-btn" data-act="q-type" data-type="' + k + '" aria-pressed="' + (q.type === k) + '"><span class="g">' + T[k].glyph + "</span><span>" + T[k].name + '<br><small class="muted">' + T[k].hint + "</small></span></button>";
     }).join("") + "</div></fieldset>";
     h += '<label class="field"><span>Your question</span><textarea class="input" data-f="prompt" rows="2" maxlength="200" style="font:600 22px var(--display)">' + esc(q.prompt) + "</textarea></label>";
+    var src = PC.images.cached(q.image);
+    h += q.image ? '<div class="photo-edit"><img class="photo-thumb" src="' + (src || "") + '" alt=""><div class="stack-16" style="gap:8px;flex:1;min-width:220px"><label class="field"><span>Describe the photo <span class="muted">(for screen readers)</span></span><input class="input" data-f="imageAlt" maxlength="160" placeholder="e.g. Diagram of the layers of the atmosphere" value="' + esc(q.imageAlt || "") + '"></label>' +
+      '<div class="controls"><button type="button" class="btn small" data-act="photo-add">Replace photo</button><button type="button" class="btn small danger" data-act="photo-del">Remove photo</button></div></div></div>'
+      : '<div class="controls"><button type="button" class="btn" data-act="photo-add" style="border-style:dashed">+ Add a photo</button><span class="note">Shows on the big screen next to the question.</span></div>';
     if (q.options) {
       var isRank = q.type === "rk", canCorrect = q.type === "mc" || q.type === "qz";
       h += '<fieldset class="stack-16" style="gap:10px"><legend>' + (isRank ? "Items to rank" : "Answers") + (canCorrect ? (q.type === "qz" ? ' <span class="muted" style="font-weight:600">· mark the correct one</span>' : ' <span class="muted" style="font-weight:600">· marking a correct one is optional</span>') : "") + "</legend>" +
@@ -191,6 +231,20 @@
   app.addEventListener("input", onEditInput);
   app.addEventListener("change", function (e) { if (e.target.type === "radio" || e.target.tagName === "SELECT" || e.target.type === "checkbox") onEditInput(e); });
 
+  function pickPhoto() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = async function () {
+      var f = inp.files[0]; if (!f) return;
+      if (f.size > 25 * 1024 * 1024) { PC.toast("That photo is too big (over 25 MB). Try a smaller one."); return; }
+      try {
+        PC.toast("Adding photo…");
+        var id = await PC.images.add(f), q = deck.questions[editQ];
+        q.image = id; if (!q.imageAlt) q.imageAlt = "";
+        Store.saveDeck(deck); renderQEdit(); PC.toast("Photo added.");
+      } catch (e) { PC.toast("Couldn’t read that file. Try a JPG or PNG photo."); }
+    };
+    inp.click();
+  }
   function addQuestion() {
     var m = PC.modal("Add a question", '<div class="types">' + Object.keys(R.TYPES).map(function (k) {
       return '<button type="button" class="type-btn" data-new="' + k + '"><span class="g">' + R.TYPES[k].glyph + "</span><span>" + R.TYPES[k].name + '<br><small class="muted">' + R.TYPES[k].hint + "</small></span></button>";
@@ -212,6 +266,14 @@
   var PRESENT_MS = 70000;
 
   async function startSession(deckId) {
+    if (!PC.secure) {
+      PC.modal("Open the secure address", '<p>Rooms need your browser’s security features, which only work when the page address starts with <b>https://</b>.</p><p class="note" style="margin-top:10px">If you just set up a custom domain on GitHub Pages, turn on <b>Enforce HTTPS</b> in the repository’s Settings → Pages (it can take a few minutes to become available). If you opened the file straight from your computer, use the local server described in the README instead.</p><div class="modal-actions"><button type="button" class="btn primary" data-close>OK</button></div>');
+      return;
+    }
+    try { await startSessionInner(deckId); }
+    catch (e) { console.error(e); PC.modal("Couldn’t open the room", '<p>' + esc((e && e.message) || String(e)) + '</p><p class="note" style="margin-top:10px">Try reloading the page. If it keeps happening, use “Feedback or bug?” at the bottom and mention your browser.</p><div class="modal-actions"><button type="button" class="btn primary" data-close>OK</button></div>'); }
+  }
+  async function startSessionInner(deckId) {
     var d = Store.deck(deckId);
     var probs = d.questions.map(R.problems);
     var badIdx = probs.map(function (p, i) { return p.length ? i + 1 : 0; }).filter(Boolean);
@@ -261,6 +323,7 @@
       onHostStatus: function (st) { live.hostStatus = st; paintConn(); }
     });
     live.tick = setInterval(tick, 1000);
+    await PC.images.preload(s.questions);
     if (!s.status[curQ().id]) openQuestion(s.qi, true);
     renderLive();
   }
@@ -312,6 +375,7 @@
     if (q.type === "wc") d.q.maxWords = q.maxWords || 1;
     if (q.type === "rs") { d.q.scaleMax = q.scaleMax; d.q.lowLabel = q.lowLabel; d.q.highLabel = q.highLabel; }
     if (q.timer) d.q.timer = q.timer;
+    if (q.image) d.q.photo = 1;
     d.q.started = !!st.openedAt;
     if (q.type === "wc" || q.type === "qa") d.q.moderate = !!q.moderate;
     if (st.revealed && q.correct != null) d.q.correct = q.correct;
@@ -468,7 +532,8 @@
     ctrl.push('<button type="button" class="btn primary" data-act="next">' + (s.qi === s.questions.length - 1 ? "Finish" : "Next →") + "</button>");
     box.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center"><span class="label">Question ' + (s.qi + 1) + " of " + s.questions.length + " · " + T.name +
       '</span><span class="chip" id="statusChip"></span></div><h1 class="q-title">' + esc(q.prompt) + "</h1></div>" +
-      '<div id="resultsArea" aria-live="polite"></div><div class="controls" id="ctrl">' + ctrl.join("") + "</div>" +
+      (q.image ? '<div class="q-body"><figure class="q-media"><button type="button" class="photo-btn" data-act="photo-zoom" aria-label="Show the photo larger"><img src="' + (PC.images.cached(q.image) || "") + '" alt="' + esc(q.imageAlt || "Photo for this question") + '"></button></figure><div id="resultsArea" aria-live="polite"></div></div>' : '<div id="resultsArea" aria-live="polite"></div>') +
+      '<div class="controls" id="ctrl">' + ctrl.join("") + "</div>" +
       '<div class="crowd-row"><span class="label" id="crowdLabel">In the igloo · 0</span><div class="crowd" id="crowd"></div></div>';
     renderResultsArea(); paintTimer();
   }
@@ -555,6 +620,7 @@
      ========================================================= */
   function renderResults(id) {
     var s = Store.session(id);
+    if (needPhotos(s.questions)) PC.images.preload(s.questions).then(function () { if (view === "results") renderResults(id); });
     var hasQuiz = s.questions.some(function (q) { return q.type === "qz"; });
     app.innerHTML = topBar('<button type="button" class="btn" data-act="home">← Home</button>') +
       '<main class="page stack-16" style="gap:22px"><div><span class="label">Results</span><h1 style="font-size:38px">' + esc(s.title) + '</h1><p class="muted">' + fmtDate(s.startedAt) + " · room " + esc(s.code) + " · " + Object.keys(s.roster).length + " students" + (s.endedAt ? "" : " · still open") + "</p></div>" +
@@ -563,7 +629,9 @@
       '<p class="note">Answers are anonymous: exports show buddies and optional nicknames only, never names or emails.</p></div>' +
       s.questions.map(function (q, i) {
         var v = R.view(s, q, { reveal: true, limit: 100 });
-        return '<section class="card stack-16"><span class="label">Question ' + (i + 1) + " · " + R.TYPES[q.type].name + " · " + (v.data.total) + (v.data.total === 1 ? " student" : " students") + '</span><h2 style="font-size:28px">' + esc(q.prompt) + "</h2>" + v.html + "</section>";
+        var im = q.image && PC.images.cached(q.image);
+        return '<section class="card stack-16"><span class="label">Question ' + (i + 1) + " · " + R.TYPES[q.type].name + " · " + (v.data.total) + (v.data.total === 1 ? " student" : " students") + '</span><h2 style="font-size:28px">' + esc(q.prompt) + "</h2>" +
+          (im ? '<img class="photo-result" src="' + im + '" alt="' + esc(q.imageAlt || "Photo for this question") + '">' : "") + v.html + "</section>";
       }).join("") +
       (hasQuiz ? '<section class="card stack-16"><h2>Final quiz leaderboard</h2>' + (R.leaderboard(s, 10).map(function (x) { return '<div class="leader"><span class="rank">' + x.rank + "</span>" + B.svg(x.k, x.v, x.l, 44) + '<span class="who">' + esc(R.buddyName(x)) + '</span><span class="pts">' + x.pts + "</span></div>"; }).join("") || '<p class="muted">No quiz answers were revealed.</p>') + "</section>" : "") +
       "</main>" + footer();
@@ -630,8 +698,11 @@
       try {
         var d = JSON.parse(await inp.files[0].text());
         if (!d || !Array.isArray(d.questions)) throw 0;
+        var pics = d.images && typeof d.images === "object" ? d.images : {}, newIds = {};
+        for (var pid in pics) { if (/^data:image\/(jpeg|png|webp|gif);base64,/.test(String(pics[pid]))) newIds[pid] = await PC.images.save(pics[pid]); }
         var qs = d.questions.filter(function (q) { return q && R.TYPES[q.type]; }).map(function (q) {
           var n = R.blank(q.type); Object.keys(n).forEach(function (k) { if (k !== "id" && q[k] != null) n[k] = q[k]; });
+          if (q.image && newIds[q.image]) { n.image = newIds[q.image]; n.imageAlt = String(q.imageAlt || "").slice(0, 160); }
           n.prompt = String(n.prompt || "").slice(0, 200); if (n.options) n.options = n.options.slice(0, 8).map(function (o) { return String(o || "").slice(0, 80); });
           return n;
         });
@@ -671,7 +742,10 @@
       case "edit": editQ = 0; go("#edit/" + id); break;
       case "dup": var dd = Store.deck(id); dd.id = PC.uid(8); dd.title = dd.title + " (copy)"; dd.questions.forEach(function (q) { q.id = PC.uid(8); }); Store.saveDeck(dd); renderHome(); break;
       case "del-deck": if (await PC.confirm("Delete this question set?", "“" + esc(Store.deck(id).title) + "” will be deleted from this computer. Past results are kept.", "Delete", true)) { Store.delDeck(id); renderHome(); } break;
-      case "export-deck": var de = Store.deck(id); downloadFile(fileSafe(de.title) + ".pollercrowd.json", JSON.stringify({ app: "Poller Crowd", version: 1, title: de.title, questions: de.questions }, null, 1)); break;
+      case "export-deck":
+        var de = Store.deck(id); await PC.images.preload(de.questions);
+        var pics = {}; de.questions.forEach(function (q) { if (q.image && PC.images.cached(q.image)) pics[q.image] = PC.images.cached(q.image); });
+        downloadFile(fileSafe(de.title) + ".pollercrowd.json", JSON.stringify({ app: "Poller Crowd", version: 1, title: de.title, questions: de.questions, images: pics }, null, 1)); break;
       case "import": importDeck(); break;
       case "present": if (deck && view === "edit") Store.saveDeck(deck); startSession(id); break;
       case "resume": go("#live"); break;
@@ -690,6 +764,9 @@
         var oq = deck.questions[editQ], oi = +b.getAttribute("data-i"); oq.options.splice(oi, 1);
         if (oq.correct != null) { if (oq.correct === oi) oq.correct = oq.type === "qz" ? 0 : null; else if (oq.correct > oi) oq.correct--; }
         Store.saveDeck(deck); refreshList(); renderQEdit(); break;
+      case "photo-add": pickPhoto(); break;
+      case "photo-del": delete deck.questions[editQ].image; delete deck.questions[editQ].imageAlt; Store.saveDeck(deck); renderQEdit(); break;
+      case "photo-zoom": var zi = $(".q-media img"); if (zi) PC.modal(curQ().prompt, '<img src="' + zi.src + '" alt="' + esc(zi.alt) + '" style="width:100%;border-radius:16px;display:block">', { wide: true }); break;
       case "no-correct": deck.questions[editQ].correct = null; Store.saveDeck(deck); renderQEdit(); break;
       // ---- live ----
       case "prev": openQuestion(live.s.qi - 1); break;

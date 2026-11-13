@@ -163,7 +163,7 @@
     var q = state.q, h = "";
     var mine = room.ans[q.id];
     h += '<div class="stack-16" style="gap:6px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="label">Question ' + (q.i + 1) + " of " + q.n + '</span><span class="timer" id="timer"></span></div>' +
-      '<h1 style="font-size:27px">' + esc(q.prompt) + "</h1></div>";
+      '<h1 style="font-size:27px">' + esc(q.prompt) + "</h1>" + (q.photo ? '<p class="note" style="font-weight:700">Look up: there’s a photo on the big screen.</p>' : "") + "</div>";
     var closed = !q.open;
     if (q.type === "mc" || q.type === "qz") {
       var picked = Array.isArray(mine) ? mine : mine != null ? [mine] : [];

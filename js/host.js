@@ -135,7 +135,7 @@
     if (srv.mode === "demo") return '<div class="banner warn"><span><b>Demo mode.</b> Students have to be in other tabs of this same browser, so it’s only for trying things out. ' +
       (PC.server.site() ? 'Switch back to the shared server in <button type="button" class="linkbtn" data-act="settings">Settings</button>.' : 'To use real phones, add your Supabase project to <code>js/config.js</code> (see README), or connect your own in <button type="button" class="linkbtn" data-act="settings">Settings</button>.') + "</span></div>";
     if (srv.own) return '<div class="banner"><span>Using <b>your own Supabase project</b> (' + esc(srv.url.replace(/^https:\/\//, "")) + '). Change this in <button type="button" class="linkbtn" data-act="settings">Settings</button>.</span></div>';
-    return "";
+    return '<div class="banner"><span><b>Heads up:</b> you’re on the shared connection, which handles about <b>200 people at once</b>, counting every class using Poller Crowd at that moment. For big lectures or regular use, <a href="setup.html" target="_blank" rel="noopener">set up your own free Supabase</a> (5 minutes) and add it in <button type="button" class="linkbtn" data-act="settings">Settings</button>.</span></div>';
   }
 
   /* =========================================================

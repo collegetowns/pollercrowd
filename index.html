@@ -18,7 +18,8 @@
   .hero h1 { font-size: clamp(40px, 6vw, 68px); }
   .hero .art { flex: 1 1 300px; display: flex; justify-content: center; }
   .doors { max-width: 1120px; margin: 0 auto; padding: 20px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
-  .door { display: flex; flex-direction: column; gap: 14px; }
+  .door { display: flex; flex-direction: column; gap: 14px; height: 100%; }
+  .door .btn.big { width: 100%; }
   .features { max-width: 1120px; margin: 0 auto; padding: 10px 24px 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
   .feature { padding: 18px 20px; border-radius: 20px; background: var(--panel); display: flex; gap: 14px; align-items: flex-start; }
   .feature .g { flex: none; display: inline-flex; width: 38px; height: 38px; border-radius: 11px; align-items: center; justify-content: center; background: var(--panel2); color: var(--label); font: 600 18px var(--display); }
@@ -45,14 +46,15 @@
       <label class="field"><span>Room code from the big screen</span>
         <input class="input" id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="IGLOO 482" style="text-align:center;font:700 28px var(--display);letter-spacing:3px;min-height:60px"></label>
       <p class="warm" id="err" role="alert" style="font-weight:700;min-height:1.2em;margin:0"></p>
-      <button class="btn primary big" type="submit">Join the crowd</button>
+      <p class="muted">No app or account needed. Scan the QR code on the big screen, or type the code here. Your answers stay anonymous.</p>
+      <button class="btn primary big" type="submit" style="margin-top:auto">Join the crowd</button>
     </form>
     <div class="card door">
       <span class="label">Teachers &amp; lecturers</span>
       <h2 style="font-size:30px">Running a class?</h2>
       <p class="muted">Build a question set, put it on the projector, and watch the answers roll in. Everything you make is saved on your own computer.</p>
+      <div class="banner" style="font-size:15px"><span><b>Heads up:</b> the shared connection handles about <b>200 people at once</b>, counting every class using Poller Crowd at that moment. For big lectures or regular use, <a href="setup.html">set up your own free Supabase</a> (5 minutes) and get 200 just for you.</span></div>
       <a class="btn primary big" href="host.html" style="margin-top:auto">Open the teacher screen</a>
-      <a class="btn" href="setup.html" style="align-self:flex-start">Use your own free Supabase (optional)</a>
     </div>
   </section>
 

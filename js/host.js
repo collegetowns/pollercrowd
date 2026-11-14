@@ -332,10 +332,24 @@
       PC.modal("Open the secure address", '<p>Rooms need your browser’s security features, which only work when the page address starts with <b>https://</b>.</p><p class="note" style="margin-top:10px">If you just set up a custom domain on GitHub Pages, turn on <b>Enforce HTTPS</b> in the repository’s Settings → Pages (it can take a few minutes to become available). If you opened the file straight from your computer, use the local server described in the README instead.</p><div class="modal-actions"><button type="button" class="btn primary" data-close>OK</button></div>');
       return;
     }
-    try { await startSessionInner(deckId); }
+    var dd = Store.deck(deckId), mode = "teacher";
+    var nqz = dd ? dd.questions.filter(function (q) { return q.type === "qz" && !R.problems(q).length; }).length : 0;
+    if (nqz) { mode = await chooseMode(nqz, dd.questions.length); if (!mode) return; }
+    try { await startSessionInner(deckId, mode); }
     catch (e) { console.error(e); PC.modal("Couldn’t open the room", '<p>' + esc((e && e.message) || String(e)) + '</p><p class="note" style="margin-top:10px">Try reloading the page. If it keeps happening, use “Feedback or bug?” at the bottom and mention your browser.</p><div class="modal-actions"><button type="button" class="btn primary" data-close>OK</button></div>'); }
   }
-  async function startSessionInner(deckId) {
+  function chooseMode(nqz, total) {
+    return new Promise(function (resolve) {
+      var picked = null;
+      var m = PC.modal("How should the quiz race run?", '<div class="stack-16" style="gap:12px">' +
+        '<button type="button" class="mode-card" data-mode="teacher"><b>Together, led by you</b><span>One question at a time on the big screen. You start each question and reveal the answer. Works with every question in the set.</span></button>' +
+        '<button type="button" class="mode-card" data-mode="self"><b>Self-paced race</b><span>Students race through the ' + nqz + (nqz === 1 ? " quiz race question" : " quiz race questions") + ' on their own phones, each with their own timer. The big screen shows a live leaderboard, then the podium.' +
+        (total > nqz ? " Other kinds of questions in this set are skipped." : "") + "</span></button></div>",
+        { onClose: function () { resolve(picked); } });
+      m.el.addEventListener("click", function (e) { var b = e.target.closest("[data-mode]"); if (b) { picked = b.getAttribute("data-mode"); m.close(); } });
+    });
+  }
+  async function startSessionInner(deckId, mode) {
     var d = Store.deck(deckId);
     var probs = d.questions.map(R.problems);
     var badIdx = probs.map(function (p, i) { return p.length ? i + 1 : 0; }).filter(Boolean);
@@ -362,12 +376,15 @@
       c.prompt = String(c.prompt).trim();
       return c;
     });
+    if (mode === "self") qs = qs.filter(function (q) { return q.type === "qz"; });
     var srv = PC.server.current();
     var s = {
       id: PC.uid(8), deckId: d.id, title: d.title || "Untitled", code: keys.code, fp: keys.fp,
       keys: { pub: keys.pub, jwk: keys.jwk }, server: srv.mode === "supabase" && srv.own ? { url: srv.url, key: srv.key } : (srv.mode === "demo" ? "demo" : "site"),
-      startedAt: Date.now(), endedAt: null, qi: 0, questions: qs, status: {}, answers: {}, words: {}, qa: {}, roster: {}, kicked: [], locked: false, showJoin: true
+      startedAt: Date.now(), endedAt: null, qi: 0, questions: qs, status: {}, answers: {}, words: {}, qa: {}, roster: {}, kicked: [], locked: false, showJoin: true,
+      mode: mode === "self" ? "self" : "teacher"
     };
+    if (s.mode === "self") s.race = { state: "lobby", starts: {}, prog: {} };
     Store.saveSession(s); PC.store.set("live", s.id);
     go("#live");
   }
@@ -387,7 +404,7 @@
     });
     live.tick = setInterval(tick, 1000);
     await PC.images.preload(s.questions);
-    if (!s.status[curQ().id]) openQuestion(s.qi, true);
+    if (s.mode !== "self" && !s.status[curQ().id]) openQuestion(s.qi, true);
     renderLive();
   }
   function pauseLiveView() { /* keep the room running while the teacher looks at other screens */ }
@@ -416,7 +433,13 @@
   }
   function tick() {
     if (!live) return;
-    var st = curSt(), now = Date.now();
+    var now = Date.now();
+    if (live.s.mode === "self") {
+      if (view === "live") { paintCrowd(); if (live.s.race.state === "running" && !live.s.podium) paintRaceSoon(); }
+      if (now - live.lastSent > 20000) sendState(false);
+      return;
+    }
+    var st = curSt();
     if (st.open && st.endsAt && now >= st.endsAt) { st.open = false; st.endsAt = null; sendState(true); saveSoon(); if (view === "live") renderStage(); }
     if (view === "live") { paintTimer(); paintCrowd(); }
     if (now - live.lastSent > 20000) sendState(false); // keep late joiners in sync
@@ -428,10 +451,12 @@
     return Object.keys(r).filter(function (p) { return now - (r[p].seen || 0) < PRESENT_MS && live.s.kicked.indexOf(p) < 0; });
   }
   function buildState() {
-    var s = live.s, q = curQ(), st = curSt(), now = Date.now();
+    var s = live.s, now = Date.now();
     var d = { v: ++live.seq, code: s.code, title: s.title, ended: !!s.endedAt, locked: !!s.locked, kicked: s.kicked };
     var roster = {}; Object.keys(s.roster).forEach(function (p) { var x = s.roster[p]; roster[p] = x.k + "." + x.v + "." + x.l; });
     d.roster = roster;
+    if (s.mode === "self") { d.self = raceState(); if (s.podium) addPodium(d); return d; }
+    var q = curQ(), st = curSt();
     d.q = { id: q.id, i: s.qi, n: s.questions.length, type: q.type, prompt: q.prompt, open: !!st.open, revealed: !!st.revealed, left: st.open && st.endsAt ? Math.max(0, st.endsAt - now) : null };
     if (q.options) d.q.options = q.options;
     if (q.type === "mc") d.q.multi = !!q.multi;
@@ -455,7 +480,12 @@
       d.q.scores = mine;
       d.q.top = all.slice(0, 5).map(function (x) { return { b: x.k + "." + x.v + "." + x.l, nick: x.nick, pts: x.pts }; });
     }
-    if (s.podium) {
+    if (s.podium) addPodium(d);
+    return d;
+  }
+  function addPodium(d) {
+    var s = live.s;
+    {
       var lb = R.leaderboard(s, 0, null, true), sc = {};
       lb.forEach(function (x) { sc[x.pub] = [x.rank, x.pts]; });
       var step = s.podium.step;
@@ -516,6 +546,7 @@
     r.seen = now;
     if (m.t === "ping") return;
     if (m.t === "bye") { r.seen = 0; return; }
+    if (s.mode === "self") { onRaceMessage(m, pub, now); return; }
     var q = curQ(), st = curSt();
     if (m.q !== q.id) return;
     var A = s.answers[q.id] || (s.answers[q.id] = {});
@@ -568,7 +599,7 @@
       changedResults(); sendState(false);
     }
   }
-  var paintSoon = PC.debounce(function () { if (view === "live") { renderResultsArea(); paintCrowd(); refreshDrawer(); } }, 250);
+  var paintSoon = PC.debounce(function () { if (view === "live") { if (live && live.s.mode === "self" && !live.s.podium) renderStage(); else renderResultsArea(); paintCrowd(); refreshDrawer(); } }, 250);
   function changedResults() { saveSoon(); paintSoon(); }
 
   /* ---------- live view ---------- */
@@ -593,6 +624,7 @@
   function renderStage() {
     var box = $("#qbox"); if (!box || !live) return;
     if (live.s.podium) { renderPodium(box); return; }
+    if (live.s.mode === "self") { renderRace(box); return; }
     var s = live.s, q = curQ(), st = curSt(), T = R.TYPES[q.type];
     var ctrl = [];
     ctrl.push('<button type="button" class="btn" data-act="prev"' + (s.qi === 0 ? " disabled" : "") + '>← Back</button>');
@@ -609,16 +641,23 @@
     renderResultsArea(); paintTimer();
   }
   function renderResultsArea() {
-    var el = $("#resultsArea"); if (!el || !live || live.s.podium) return;
+    var el = $("#resultsArea"); if (!el || !live || live.s.podium || live.s.mode === "self") return;
     var s = live.s, q = curQ(), st = curSt();
     var r = R.view(s, q, { controls: true });
     var n = r.data.total, label = q.type === "wc" ? r.data.entries + (r.data.entries === 1 ? " word" : " words") + " from " + n : q.type === "qa" ? r.data.items.length + (r.data.items.length === 1 ? " question" : " questions") : n + (n === 1 ? " answer" : " answers");
     if (needsStart(q) && !st.openedAt) el.innerHTML = '<div class="frozen"><h3>Get ready…</h3><p class="muted">Press Start when everyone’s in.' + (q.type === "qz" ? " Faster correct answers score more." : " Students get " + q.timer + " seconds.") + "</p></div>";
-    else if ((st.hideResults && !st.revealed) || (q.type === "qz" && !st.revealed)) el.innerHTML = '<div class="frozen"><h3>' + (q.type === "qz" ? (st.open ? "Answers are coming in…" : "Time’s up!") : "Results are frozen for now") + '</h3><p class="muted" style="font-size:20px"><b style="font-size:40px;font-family:var(--display);color:var(--ink)">' + n + "</b> " + (n === 1 ? "answer" : "answers") + " so far</p></div>";
+    else if ((st.hideResults && !st.revealed) || (q.type === "qz" && !st.revealed)) {
+      var count = '<p class="answers-in"><b>' + n + "</b> " + (n === 1 ? "answer" : "answers") + (q.type === "qz" ? (st.open ? " in so far" : " in · time’s up!") : " in · results hidden for now") + "</p>";
+      el.innerHTML = (q.options && q.options.length ? optionCards(q) : '<div class="frozen"><h3>Results are frozen for now</h3></div>') + count;
+    }
     else el.innerHTML = r.html;
     if (r.data.pending) label += " · " + r.data.pending + " waiting for you";
     var chip = $("#statusChip");
     if (chip) chip.innerHTML = '<span class="dot' + (st.open ? "" : " off") + '"></span>' + (st.open ? "Open" : st.revealed ? "Answer shown" : "Closed") + " · " + label + '<span id="timerTxt"></span>';
+  }
+  // The answer choices, big, for the projector (no vote counts)
+  function optionCards(q) {
+    return '<div class="optgrid">' + q.options.map(function (o, i) { return '<div class="optcard"><span class="letter">' + R.LETTERS[i] + "</span><span>" + esc(o) + "</span></div>"; }).join("") + "</div>";
   }
   function paintTimer() {
     var t = $("#timerTxt"); if (!t || !live) return;
@@ -852,6 +891,8 @@
         break;
       case "podium-next": live.s.podium.step = nextStep(); sendState(true); saveSoon(); renderStage(); break;
       case "podium-back": live.s.podium = null; sendState(true); saveSoon(); renderStage(); break;
+      case "race-start": raceStart(); break;
+      case "race-end": if (live.s.race.state === "running") { if (await PC.confirm("End the race?", "Students who haven’t finished will stop where they are. Then the podium!", "End the race")) raceEnd(); } else raceEnd(); break;
       case "end": endSession(); break;
       case "start": startVoting(curSt(), curQ()); sendState(true); saveSoon(); renderStage(); break;
       case "toggle-open": var so = curSt(); if (so.open) { so.open = false; so.endsAt = null; } else startVoting(so, curQ()); sendState(true); saveSoon(); renderStage(); break;
@@ -896,11 +937,86 @@
       if (a === "end") endSession();
     });
   }
+  /* ---------- self-paced race ---------- */
+  // Students move through the quiz race questions on their own phones. The teacher's screen
+  // times each question from when the phone says it showed it, so nobody can fake a fast time,
+  // and correct answers never leave this screen until the race is over.
+  function raceState() {
+    var s = live.s, r = s.race, res = {}, tot = {};
+    var lb = R.leaderboard(s, 0, null, true); lb.forEach(function (x) { tot[x.pub] = [x.pts, x.rank]; });
+    s.questions.forEach(function (q, i) {
+      var A = s.answers[q.id] || {};
+      Object.keys(A).forEach(function (p) { (res[p] = res[p] || []).push(i + ":" + (A[p].pts > 0 ? 1 : 0) + ":" + (A[p].pts || 0)); });
+    });
+    Object.keys(res).forEach(function (p) { res[p] = res[p].join(","); });
+    return {
+      state: r.state, n: s.questions.length, res: res, tot: tot, players: lb.length,
+      qs: r.state === "lobby" ? [] : s.questions.map(function (q) { return { id: q.id, prompt: q.prompt, options: q.options, timer: q.timer || 20, multi: R.corrects(q).length > 1 ? 1 : 0 }; })
+    };
+  }
+  function onRaceMessage(m, pub, now) {
+    var s = live.s, r = s.race;
+    if (r.state !== "running") return;
+    var i = parseInt(m.i, 10); if (!(i >= 0 && i < s.questions.length)) return;
+    var q = s.questions[i], starts = r.starts[pub] || (r.starts[pub] = {});
+    if (m.t === "qs") { if (!starts[i]) { starts[i] = now; r.prog[pub] = Math.max(r.prog[pub] || 0, i); saveSoon(); } return; }
+    if (m.t === "sa") {
+      var A = s.answers[q.id] || (s.answers[q.id] = {});
+      if (A[pub] || !starts[i]) return;
+      var v = m.v, ms = now - starts[i], limit = (q.timer || 20) * 1000 + 2500;
+      if (!Number.isInteger(v) || v < -1 || v >= q.options.length) return;
+      A[pub] = v < 0 || ms > limit ? { c: v < 0 ? null : v, ms: ms, pts: 0 } : { c: v, ms: ms, pts: R.quizPoints(q, v, ms) };
+      r.prog[pub] = Math.max(r.prog[pub] || 0, i + 1);
+      sendState(false); saveSoon(); paintRaceSoon();
+    }
+  }
+  var paintRaceSoon = PC.debounce(function () { if (view === "live" && live && live.s.mode === "self" && !live.s.podium) renderStage(); }, 400);
+  function renderRace(box) {
+    var s = live.s, r = s.race, n = s.questions.length;
+    var players = Object.keys(s.roster).filter(function (p) { return s.kicked.indexOf(p) < 0; });
+    var head = '<div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center"><span class="label">Self-paced quiz race · ' + n + (n === 1 ? " question" : " questions") + '</span><span class="chip" id="statusChip"></span></div>';
+    if (r.state === "lobby") {
+      box.innerHTML = head + '<h1 class="q-title">Get ready to race!</h1><p class="muted" style="font-size:20px">When you press Start, everyone races through the questions on their own phone. Faster right answers score more points.</p></div>' +
+        '<div class="frozen"><h3 style="font-size:44px">' + players.length + (players.length === 1 ? " racer" : " racers") + ' ready</h3><p class="muted">Students: scan the code and pick a buddy.</p></div>' +
+        '<div class="controls" id="ctrl"><button type="button" class="btn primary big" data-act="race-start"' + (players.length ? "" : " disabled") + '>Start the race</button></div>' +
+        '<div class="crowd-row"><span class="label" id="crowdLabel">In the igloo · 0</span><div class="crowd" id="crowd"></div></div>';
+      paintCrowd(); paintRaceChip(); return;
+    }
+    var lb = R.leaderboard(s, 0, null, true), done = players.filter(function (p) { return (r.prog[p] || 0) >= n; }).length;
+    var perQ = s.questions.map(function (q) { return Object.keys(s.answers[q.id] || {}).length; });
+    var maxQ = Math.max.apply(null, perQ.concat([1]));
+    box.innerHTML = head + '<h1 class="q-title">' + (r.state === "running" ? "The race is on!" : "Race over!") + "</h1></div>" +
+      '<div class="race-grid"><div class="stack-16" style="gap:8px"><span class="label">Leaderboard</span>' +
+      (lb.length ? lb.slice(0, 8).map(function (x) {
+        return '<div class="leader"><span class="rank">' + x.rank + "</span>" + B.svg(x.k, x.v, x.l, 44) + '<span class="who">' + esc(R.buddyName(x)) + '<small class="race-prog">' + Math.min(n, r.prog[x.pub] || 0) + " of " + n + '</small></span><span class="pts">' + x.pts + "</span></div>";
+      }).join("") : '<p class="muted">Points show up here as answers come in.</p>') + "</div>" +
+      '<div class="stack-16" style="gap:10px"><span class="label">Progress</span><div class="stat-row"><div class="stat"><span class="label">Finished</span><b>' + done + '</b><span class="muted">of ' + players.length + "</span></div></div>" +
+      s.questions.map(function (q, i) { return '<div class="bar-row"><div class="bar-head" style="font-size:16px"><span class="bar-label"><span class="letter">' + (i + 1) + '</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(q.prompt) + '</span></span><span class="muted">' + perQ[i] + '</span></div><div class="track" style="height:12px"><div class="fill" style="width:' + Math.round(perQ[i] / maxQ * 100) + '%"></div></div></div>'; }).join("") +
+      "</div></div>" +
+      '<div class="controls" id="ctrl"><button type="button" class="btn primary big" data-act="race-end">' + (r.state === "running" ? "End the race & show the podium" : "Show the podium") + "</button></div>";
+    paintRaceChip();
+  }
+  function paintRaceChip() {
+    var c = $("#statusChip"); if (!c || !live) return; var r = live.s.race;
+    c.innerHTML = '<span class="dot' + (r.state === "running" ? "" : r.state === "lobby" ? " wait" : " off") + '"></span>' + (r.state === "lobby" ? "Waiting to start" : r.state === "running" ? "Racing" : "Finished");
+  }
+  function raceStart() {
+    var s = live.s, now = Date.now();
+    s.race.state = "running"; s.race.startedAt = now;
+    s.questions.forEach(function (q) { s.status[q.id] = { open: false, openedAt: now, revealed: false }; });
+    sendState(true); saveSoon(); renderStage();
+  }
+  function raceEnd() {
+    var s = live.s; s.race.state = "done";
+    s.questions.forEach(function (q) { var st = s.status[q.id] || (s.status[q.id] = {}); st.revealed = true; if (!st.openedAt) st.openedAt = Date.now(); });
+    openPodium();
+  }
+
   /* ---------- competition podium ---------- */
   function hasQuiz(s) { return s.questions.some(function (q) { return q.type === "qz"; }); }
   function openPodium() {
     var s = live.s; s.podium = { step: 0 }; s.podiumShown = true;
-    var st = curSt(); if (st.open) { st.open = false; st.endsAt = null; }
+    if (s.mode !== "self") { var st = curSt(); if (st.open) { st.open = false; st.endsAt = null; } }
     sendState(true); saveSoon(); renderStage();
   }
   // With fewer than 3 players, skip the empty steps
@@ -923,7 +1039,7 @@
     box.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px;text-align:center"><span class="label">Competition results · ' + lb.length + (lb.length === 1 ? " player" : " players") + '</span><h1 class="q-title">' + (step >= 3 ? "Top of the iceberg!" : "And the winners are…") + "</h1></div>" +
       (lb.length ? '<div class="podium">' + spot(2, 150) + spot(1, 210) + spot(3, 110) + "</div>" : '<div class="frozen"><h3>No quiz answers yet</h3><p class="muted">Run a quiz race question first, then come back here.</p></div>') +
       (rest.length ? '<div class="pod-rest">' + rest.map(function (x) { return '<span class="chip">' + x.rank + ". " + B.svg(x.k, x.v, x.l, 26) + esc(R.buddyName(x)) + " · " + x.pts + "</span>"; }).join("") + "</div>" : "") +
-      '<div class="controls" id="ctrl" style="justify-content:center"><button type="button" class="btn" data-act="podium-back">← Back to questions</button>' +
+      '<div class="controls" id="ctrl" style="justify-content:center"><button type="button" class="btn" data-act="podium-back">' + (s.mode === "self" ? "← Back to the race" : "← Back to questions") + '</button>' +
       (step < 3 && lb.length ? '<button type="button" class="btn primary big" data-act="podium-next">' + next + "</button>" : "") +
       '<button type="button" class="btn' + (step >= 3 || !lb.length ? " primary" : "") + '" data-act="end">End session</button></div>';
     if (step >= 3 && !box.getAttribute("data-confetti")) { box.setAttribute("data-confetti", "1"); confetti(box); }
@@ -945,7 +1061,7 @@
   }
   document.addEventListener("keydown", function (e) {
     if (view !== "live" || !live || e.target.closest("input,textarea,select,[contenteditable]") || $(".modal") || e.metaKey || e.ctrlKey || e.altKey) return;
-    var map = live.s.podium ? { ArrowRight: "podium-next", " ": "podium-next" } : { ArrowRight: "next", ArrowLeft: "prev", " ": "toggle-open", r: "toggle-results", R: "toggle-results" };
+    var map = live.s.mode === "self" && !live.s.podium ? {} : live.s.podium ? { ArrowRight: "podium-next", " ": "podium-next" } : { ArrowRight: "next", ArrowLeft: "prev", " ": "toggle-open", r: "toggle-results", R: "toggle-results" };
     if (e.key === "f" || e.key === "F") { toggleFS(); return; }
     var act = map[e.key]; if (!act) return;
     var btn = $('#ctrl [data-act="' + act + '"]') || (act === "toggle-open" ? $('#ctrl [data-act="start"]') : null);

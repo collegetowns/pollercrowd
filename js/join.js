@@ -104,6 +104,7 @@
     else if (!state) h = header() + waitCard("Finding the igloo…", status === "SUBSCRIBED" ? "Waiting for the teacher’s screen. Make sure the room is open on the projector." : "Connecting to the room…", true) + (Date.now() - gotAt > 8000 ? '<p class="note" style="text-align:center">Still waiting? Double-check the room code, or scan the QR code again.</p>' : "");
     else if (state.locked && !state.roster[me]) h = header() + waitCard("This room is locked", "The teacher has closed the doors for now. Ask them to unlock it.", false);
     else if (state.podium) h = header() + podiumScreen();
+    else if (state.self) h = header() + raceScreen();
     else h = header() + questionScreen();
     app.innerHTML = '<div class="phone">' + h + footer() + "</div>";
     PC.initThemeButtons(); paintStatus();
@@ -242,7 +243,61 @@
     if (s) h += '<p class="muted" style="font-size:18px">You have <b style="color:var(--ink)">' + s[0] + "</b> points · place " + s[1] + " of " + s[2] + "</p>";
     return h + "</div>";
   }
+  /* ---------- self-paced race ---------- */
+  // room.race = { i: current question, shown: {i: when it appeared here}, ans: {i: choice or -1 for time's up} }
+  var advanceTimer = null;
+  function raceData() { if (!room.race) room.race = { i: 0, shown: {}, ans: {} }; return room.race; }
+  function myResults() {
+    var out = {}, str = state.self.res && state.self.res[me];
+    if (str) str.split(",").forEach(function (x) { var p = x.split(":"); out[+p[0]] = { ok: p[1] === "1", pts: +p[2] }; });
+    return out;
+  }
+  function raceScreen() {
+    var S = state.self, rd = raceData(), mine = myResults(), tot = S.tot && S.tot[me];
+    var score = '<div class="race-score"><span>Score</span><b>' + (tot ? tot[0] : 0) + "</b>" + (tot ? "<span>place " + tot[1] + " of " + S.players + "</span>" : "") + "</div>";
+    if (S.state === "lobby") return '<div class="wait-card"><h1 style="font-size:30px">Get ready to race!</h1><p class="muted">When your teacher presses Start, you’ll race through ' + "the questions on your own. Faster right answers score more!</p></div>";
+    if (S.state === "done") return score + '<div class="wait-card"><h1 style="font-size:28px">Race over!</h1><p class="muted">Watch the big screen for the podium.</p></div>' + resultList(S, mine);
+    var i = rd.i;
+    if (i >= S.qs.length) return score + '<div class="wait-card"><h1 style="font-size:28px">You finished!</h1><p class="muted">Nice racing. Wait for everyone else, then watch the big screen.</p></div>' + resultList(S, mine);
+    var q = S.qs[i];
+    if (!rd.shown[i]) { rd.shown[i] = Date.now(); saveRoom(); send({ t: "qs", i: i }); }
+    var picked = rd.ans[i];
+    var h = score + '<div class="stack-16" style="gap:6px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="label">Question ' + (i + 1) + " of " + S.qs.length + '</span><span class="timer" id="timer"></span></div>' +
+      '<div class="race-dots" aria-hidden="true">' + S.qs.map(function (_, j) { var r = mine[j]; return '<i class="' + (j === i ? "now" : r ? (r.ok ? "ok" : "no") : rd.ans[j] != null ? "wait" : "") + '"></i>'; }).join("") + "</div>" +
+      '<h1 style="font-size:26px">' + esc(q.prompt) + "</h1>" + (q.multi ? '<p class="note">More than one answer is right. Pick any one of them.</p>' : "") + "</div>";
+    if (picked != null) {
+      h += '<div class="wait-card"><h2 style="font-size:28px">' + (picked < 0 ? "Time’s up!" : "Locked in!") + '</h2><p class="muted">Next question coming up…</p></div>';
+      scheduleAdvance();
+      return h;
+    }
+    h += '<div class="stack-16" style="gap:10px" role="radiogroup" aria-label="Answers">' + q.options.map(function (o, k) {
+      return '<button type="button" class="opt" role="radio" aria-checked="false" data-race="' + k + '"><span class="letter">' + LETTERS[k] + "</span><span>" + esc(o) + "</span></button>";
+    }).join("") + "</div>";
+    return h;
+  }
+  function resultList(S, mine) {
+    var rows = S.qs.map(function (q, j) { var r = mine[j]; return '<div class="leader" style="padding:8px 12px"><span class="rank" style="font-size:18px">' + (j + 1) + '</span><span class="who" style="font-size:15px">' + esc(q.prompt) + '</span><span class="pts" style="font-size:18px">' + (r ? (r.ok ? "✓ " + r.pts : "✗") : "…") + "</span></div>"; }).join("");
+    return '<div class="stack-16" style="gap:6px"><span class="label">Your answers</span>' + rows + "</div>";
+  }
+  function scheduleAdvance() {
+    if (advanceTimer) return;
+    advanceTimer = setTimeout(function () { advanceTimer = null; var rd = raceData(); if (rd.ans[rd.i] != null) { rd.i++; saveRoom(); render(); } }, 1300);
+  }
+  function raceAnswer(k) {
+    var rd = raceData(), i = rd.i; if (rd.ans[i] != null) return;
+    rd.ans[i] = k; saveRoom(); render();
+    send({ t: "sa", i: i, v: k });
+  }
+  function raceTick() {
+    var S = state && state.self; if (!S || S.state !== "running" || state.podium) return;
+    var rd = raceData(), i = rd.i, q = S.qs[i]; if (!q || rd.ans[i] != null || !rd.shown[i]) return;
+    var left = rd.shown[i] + q.timer * 1000 - Date.now(), t = $("#timer");
+    if (t) t.textContent = Math.max(0, Math.ceil(left / 1000)) + "s";
+    if (left <= 0) raceAnswer(-1);
+  }
+
   function tickTimer() {
+    raceTick();
     var t = $("#timer"); if (!t || !state || !state.q) return;
     var q = state.q;
     if (q.open && q.endsLocal) { var sLeft = Math.max(0, Math.ceil((q.endsLocal - Date.now()) / 1000)); t.textContent = sLeft + "s"; }
@@ -269,6 +324,7 @@
       screen = "main"; picking = null; delete drafts.nick; sayHi(); render(); return;
     }
     if (act === "change-buddy") { screen = "pick"; picking = null; render(); return; }
+    if (b.hasAttribute("data-race")) { raceAnswer(+b.getAttribute("data-race")); return; }
     if (!q) return;
     if (b.hasAttribute("data-opt")) {
       var i = +b.getAttribute("data-opt");

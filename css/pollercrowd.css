@@ -258,3 +258,23 @@ legend { padding: 0; margin-bottom: 8px; font-weight: 800; }
 .confetti i { position: absolute; top: -20px; width: 10px; height: 14px; border-radius: 2px; animation: fall linear forwards; }
 @keyframes fall { to { transform: translateY(820px) rotate(540deg); opacity: .2; } }
 @media (prefers-reduced-motion: reduce) { .pod-spot.shown .pod-who, .trophy { animation: none; } }
+/* ---------- mode picker, answer cards, self-paced race ---------- */
+.mode-card { display: flex; flex-direction: column; gap: 6px; width: 100%; padding: 18px 20px; border-radius: 18px; border: 2px solid var(--border2); background: var(--panel2); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.mode-card:hover, .mode-card:focus-visible { border-color: var(--warm); }
+.mode-card b { font: 600 22px var(--display); }
+.mode-card span { color: var(--muted); font-weight: 600; }
+.optgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.optcard { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 18px; background: var(--panel2); font-size: clamp(18px, 1.9vw, 28px); font-weight: 800; }
+.optcard .letter { width: 44px; height: 44px; font-size: 22px; }
+.answers-in { font-size: 20px; color: var(--muted); font-weight: 700; margin-top: 14px; }
+.answers-in b { font: 700 36px var(--display); color: var(--ink); margin-right: 4px; }
+.race-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px 32px; align-items: start; }
+.race-prog { display: block; font: 700 13px var(--body); color: var(--muted); }
+.race-score { display: flex; align-items: baseline; gap: 10px; padding: 10px 16px; border-radius: 16px; background: var(--panel); font-weight: 800; color: var(--muted); }
+.race-score b { font: 700 30px var(--display); color: var(--ink); }
+.race-dots { display: flex; gap: 6px; flex-wrap: wrap; }
+.race-dots i { width: 14px; height: 14px; border-radius: 50%; background: var(--panel2); border: 2px solid var(--border2); }
+.race-dots i.now { border-color: var(--warm); background: var(--warm); }
+.race-dots i.ok { background: var(--live); border-color: var(--live); }
+.race-dots i.no { background: var(--danger); border-color: var(--danger); }
+.race-dots i.wait { background: var(--glacier); border-color: var(--glacier); }

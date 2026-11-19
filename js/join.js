@@ -93,7 +93,13 @@
     el.innerHTML = '<span class="dot' + (ok ? "" : bad ? " off" : " wait") + '"></span>' + (code ? esc(code.replace("-", " ")) : "Poller Crowd") +
       (ok ? "" : bad ? " · reconnecting…" : state ? "" : " · connecting…");
   }
+  var holding = false, heldRender = false;
+  function release() { if (!holding) return; holding = false; if (heldRender) { heldRender = false; render(); } }
+  app.addEventListener("pointerdown", function (e) { if (e.target.id === "thIn") holding = true; });
+  app.addEventListener("touchstart", function (e) { if (e.target.id === "thIn") holding = true; }, { passive: true });
+  ["pointerup", "pointercancel", "touchend", "touchcancel"].forEach(function (ev) { document.addEventListener(ev, function () { setTimeout(release, 0); }, { passive: true }); });
   function render() {
+    if (holding) { heldRender = true; return; }
     var focusId = document.activeElement && document.activeElement.id, selStart = document.activeElement && document.activeElement.selectionStart;
     var h;
     if (screen === "code") h = codeScreen();
@@ -164,6 +170,7 @@
   function questionScreen() {
     var q = state.q, h = "";
     var mine = room.ans[q.id];
+    if (q.type === "sl") return slideScreen(q);
     h += '<div class="stack-16" style="gap:6px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="label">Question ' + (q.i + 1) + " of " + q.n + '</span><span class="timer" id="timer"></span></div>' +
       '<h1 style="font-size:27px">' + esc(q.prompt) + "</h1>" + (q.photo ? '<p class="note" style="font-weight:700">Look up: there’s a photo on the big screen.</p>' : "") + "</div>";
     var closed = !q.open;
@@ -189,6 +196,14 @@
         return '<button type="button" role="radio" aria-checked="' + (mine === i + 1) + '" data-rate="' + (i + 1) + '"' + (closed ? " disabled" : "") + ">" + (i + 1) + "</button>";
       }).join("") + '</div><div class="muted" style="display:flex;justify-content:space-between;font-weight:700;font-size:14px"><span>1 · ' + esc(q.lowLabel || "") + "</span><span>" + n + " · " + esc(q.highLabel || "") + "</span></div>";
       h += statusLine(q, mine, "Rating sent. Tap another number to change it.");
+    }
+    if (q.type === "th") {
+      var tv = drafts["t" + q.id] != null ? drafts["t" + q.id] : mine != null ? mine : 50;
+      h += '<div class="th-pick"><div class="th-val" id="thVal" aria-hidden="true">' + tv + "°<small>" + esc(leanWords(q, tv)) + "</small></div>" +
+        '<input type="range" class="th-range" id="thIn" min="0" max="100" step="1" value="' + tv + '" aria-label="Where it sits, from 0 (' + esc(q.lowLabel || "") + ") to 100 (" + esc(q.highLabel || "") + ')" aria-valuetext="' + tv + " out of 100, " + esc(leanWords(q, tv)) + '"' + (closed ? " disabled" : "") + ">" +
+        '<div class="th-ends"><span>❄ ' + esc(q.lowLabel || "") + "</span><span>" + esc(q.highLabel || "") + " 🔥</span></div></div>";
+      if (q.open) h += '<button type="button" class="btn primary big block" data-act="send-th"' + (mine != null && drafts["t" + q.id] == null ? " disabled" : "") + ">" + (mine != null ? "Update my answer" : "Lock it in") + "</button>";
+      h += statusLine(q, mine, "Sent! Slide and update it until answers close.");
     }
     if (q.type === "rk") {
       var order = drafts["r" + q.id] || room.rank[q.id] || q.options.map(function (_, i) { return i; });
@@ -218,6 +233,19 @@
         (q.open ? "" : '<div class="sent" style="color:var(--muted)">Questions are closed.</div>');
     }
     return h;
+  }
+  function leanWords(q, v) {
+    if (v <= 10) return "All the way to " + (q.lowLabel || "cold");
+    if (v < 40) return "Closer to " + (q.lowLabel || "cold");
+    if (v <= 60) return "Somewhere in the middle";
+    if (v < 90) return "Closer to " + (q.highLabel || "hot");
+    return "All the way to " + (q.highLabel || "hot");
+  }
+  function slideScreen(q) {
+    return '<div class="wait-card" style="gap:14px">' + PC.igloo(120) + '<h1 style="font-size:28px">' + esc(q.prompt) + "</h1>" +
+      (q.body ? '<p style="font-size:18px;font-weight:700;margin:0">' + esc(q.body).replace(/\n/g, "<br>") + "</p>" : "") +
+      (q.timer && q.started ? (q.done ? '<p class="th-val" style="font-size:30px">Time’s up!</p>' : '<p class="th-val" id="timer" aria-live="off"></p>') : "") +
+      '<p class="muted" style="margin:0">Nothing to answer here. Eyes on the big screen!</p></div>';
   }
   function ordinal(n) { var s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
   function podiumScreen() {
@@ -300,7 +328,7 @@
     raceTick();
     var t = $("#timer"); if (!t || !state || !state.q) return;
     var q = state.q;
-    if (q.open && q.endsLocal) { var sLeft = Math.max(0, Math.ceil((q.endsLocal - Date.now()) / 1000)); t.textContent = sLeft + "s"; }
+    if (q.open && q.endsLocal) { var sLeft = Math.max(0, Math.ceil((q.endsLocal - Date.now()) / 1000)); t.textContent = q.type === "sl" ? Math.floor(sLeft / 60) + ":" + String(sLeft % 60).padStart(2, "0") : sLeft + "s"; }
     else t.textContent = "";
   }
 
@@ -340,6 +368,7 @@
       var again = $('[data-' + (b.hasAttribute("data-up") ? "up" : "down") + '="' + np + '"]'); if (again && !again.disabled) again.focus();
       return;
     }
+    if (act === "send-th") { var tvv = drafts["t" + q.id] != null ? drafts["t" + q.id] : room.ans[q.id] != null ? room.ans[q.id] : 50; delete drafts["t" + q.id]; answer(tvv); return; }
     if (act === "send-rank") { var ord = drafts["r" + q.id].slice(); room.rank[q.id] = ord; answer(ord); return; }
     if (b.hasAttribute("data-up-q")) {
       var id = b.getAttribute("data-up-q"), ups = room.ups[q.id] || (room.ups[q.id] = {});
@@ -354,6 +383,12 @@
     if (id === "nickIn") drafts.nick = e.target.value;
     if (id === "wordIn") { drafts.w = e.target.value; var wc = $("#wordCount"); if (wc) wc.textContent = e.target.value.length + " / 25"; }
     if (id === "askIn") drafts.a = e.target.value;
+    if (id === "thIn" && state && state.q) {
+      var v = +e.target.value, qq = state.q; drafts["t" + qq.id] = v;
+      var tv = $("#thVal"); if (tv) tv.innerHTML = v + "°<small>" + esc(leanWords(qq, v)) + "</small>";
+      e.target.setAttribute("aria-valuetext", v + " out of 100, " + leanWords(qq, v));
+      var sb = $('[data-act="send-th"]'); if (sb) sb.disabled = false;
+    }
   });
   app.addEventListener("submit", function (e) {
     e.preventDefault();

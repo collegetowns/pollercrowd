@@ -9,7 +9,9 @@
     rs: { name: "Rating scale", hint: "1 to 5 or 1 to 10", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/></svg>' },
     qa: { name: "Open Q&A", hint: "Questions + upvotes", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4.5h16v11.5H10l-6 4.5z"/><path d="M10 8.7a2 2 0 1 1 2.7 1.9c-.45.2-.7.55-.7 1.05v.35"/><path d="M12 13.9v.1"/></svg>' },
     qz: { name: "Quiz race", hint: "Competition: speed scores points", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 2.5h5M12 6V2.5M18.5 6.5l1.5-1.5"/></svg>' },
-    rk: { name: "Ranking", hint: "Put items in order", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6h10M10 12h7M10 18h4"/><path d="M4.5 4.5l1-.8v4.3M3.8 11.2a1.1 1.1 0 1 1 1.9.8L3.8 14.4h2.2M3.8 16.6h2.1l-1.1 1.3a1.15 1.15 0 1 1-1.1 1.6"/></svg>' }
+    rk: { name: "Ranking", hint: "Put items in order", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6h10M10 12h7M10 18h4"/><path d="M4.5 4.5l1-.8v4.3M3.8 11.2a1.1 1.1 0 1 1 1.9.8L3.8 14.4h2.2M3.8 16.6h2.1l-1.1 1.3a1.15 1.15 0 1 1-1.1 1.6"/></svg>' },
+    th: { name: "Thermometer", hint: "Slide between two poles", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13.6V5a2 2 0 1 1 4 0v8.6a4 4 0 1 1-4 0z"/><path d="M12 9v8"/><path d="M17.5 5h2.5M17.5 9h2.5"/></svg>' },
+    sl: { name: "Info slide", hint: "Title, notes or a break", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 8.5h10M7 12h6M12 16v4M8.5 20h7"/></svg>' }
   };
   var LETTERS = "ABCDEFGH";
 
@@ -27,11 +29,16 @@
     if (type === "wc") { q.maxWords = 3; q.moderate = false; }
     if (type === "qa") { q.moderate = false; }
     if (type === "rs") { q.scaleMax = 5; q.lowLabel = "Not at all"; q.highLabel = "Very much"; }
+    if (type === "th") { q.lowLabel = ""; q.highLabel = ""; }
+    if (type === "sl") { q.body = ""; q.timer = 0; }
     return q;
   }
   // Convert a question to another type, keeping what carries over
   function convert(q, type) {
     var n = blank(type); n.id = q.id; n.prompt = q.prompt;
+    if (q.image) { n.image = q.image; n.imageAlt = q.imageAlt; }
+    if (n.lowLabel != null && (q.type === "rs" || q.type === "th")) { n.lowLabel = q.lowLabel; n.highLabel = q.highLabel; }
+    if (type === "sl" && q.body) n.body = q.body;
     if (n.options && q.options) n.options = q.options.slice(0, 8).concat(n.options.slice(q.options.length)).slice(0, Math.max(q.options.length, type === "rk" ? 3 : 2));
     if (type === "mc" || type === "qz") {
       n.correct = corrects(q).filter(function (i) { return i < n.options.length; });
@@ -42,7 +49,8 @@
   function cleanOptions(q) { return (q.options || []).map(function (o) { return String(o || "").trim(); }).filter(Boolean); }
   function problems(q) {
     var p = [];
-    if (!String(q.prompt || "").trim()) p.push("Add the question text.");
+    if (!String(q.prompt || "").trim()) p.push(q.type === "sl" ? "Add a title." : "Add the question text.");
+    if (q.type === "th" && (!String(q.lowLabel || "").trim() || !String(q.highLabel || "").trim())) p.push("Name both poles.");
     if (q.type === "mc" || q.type === "qz") { if (cleanOptions(q).length < 2) p.push("Add at least two answers."); }
     if (q.type === "rk" && cleanOptions(q).length < 2) p.push("Add at least two items to rank.");
     if (q.type === "qz" && !corrects(q).filter(function (i) { return String((q.options || [])[i] || "").trim(); }).length) p.push("Mark at least one correct answer.");
@@ -73,6 +81,16 @@
       who.forEach(function (p) { var v = +A[p]; if (v >= 1 && v <= n) { c[v - 1]++; sum += v; } });
       r.counts = c; r.avg = r.total ? sum / r.total : 0; r.max = n;
     }
+    if (q.type === "th") {
+      var vals = [], bins = []; for (var b = 0; b < 20; b++) bins.push(0);
+      who.forEach(function (p) { var v = +A[p]; if (v >= 0 && v <= 100) { vals.push(v); bins[Math.min(19, Math.floor(v / 5))]++; } });
+      vals.sort(function (a, b) { return a - b; });
+      r.total = vals.length; r.bins = bins;
+      r.avg = vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : 0;
+      r.median = vals.length ? (vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2) : 0;
+      r.low = vals.length ? vals[Math.floor((vals.length - 1) * 0.25)] : 0; r.high = vals.length ? vals[Math.ceil((vals.length - 1) * 0.75)] : 0;
+    }
+    if (q.type === "sl") r.total = 0;
     if (q.type === "rk") {
       var k = opts.length, pos = opts.map(function () { return 0; }), pts = opts.map(function () { return 0; });
       who.forEach(function (p) {
@@ -157,6 +175,16 @@
           return '<div class="col"><b>' + c + '</b><div class="colbar" style="height:' + Math.round(c / mx * 100) + '%"></div><span>' + (i + 1) + "</span></div>";
         }).join("") + '</div><div class="muted" style="display:flex;justify-content:space-between;font-weight:700"><span>1 · ' + esc(q.lowLabel || "") + "</span><span>" + r.max + " · " + esc(q.highLabel || "") + "</span></div>";
     }
+    if (q.type === "th") {
+      var mb = Math.max.apply(null, r.bins.concat([1])), avg = Math.round(r.avg);
+      h = '<div class="stat-row"><div class="stat"><span class="label">Crowd average</span><b>' + (r.total ? avg + "°" : "–") + '</b><span class="muted">' + (r.total ? esc(lean(q, r.avg)) : "out of 100°") + "</span></div>" +
+        '<div class="stat"><span class="label">Middle half of the class</span><b>' + (r.total ? r.low + "–" + r.high + "°" : "–") + '</b></div><div class="stat"><span class="label">Responses</span><b>' + r.total + "</b></div></div>" +
+        '<div class="therm" role="img" aria-label="Where students placed it, from ' + esc(q.lowLabel || "") + " to " + esc(q.highLabel || "") + (r.total ? ". Average " + avg + " out of 100" : "") + '"><div class="therm-cols">' + r.bins.map(function (c, i) {
+          return '<div class="tcol"><div class="tbar" style="height:' + Math.round(c / mb * 100) + "%;background:color-mix(in srgb, var(--warm) " + Math.round((i + 0.5) * 5) + '%, var(--glacier))">' + (c ? "<b>" + c + "</b>" : "") + "</div></div>";
+        }).join("") + '</div><div class="therm-track">' + (r.total ? '<span class="therm-pin" style="left:' + r.avg.toFixed(1) + '%"><span>' + avg + "°</span></span>" : "") + "</div>" +
+        '<div class="therm-ends"><span>❄ ' + esc(q.lowLabel || "") + "</span><span>" + esc(q.highLabel || "") + " 🔥</span></div></div>";
+    }
+    if (q.type === "sl") h = q.body ? '<p class="slide-body">' + esc(q.body).replace(/\n/g, "<br>") + "</p>" : "";
     if (q.type === "rk") {
       h = '<div class="bars">' + r.rows.map(function (row, i) {
         return '<div class="bar-row"><div class="bar-head"><span class="bar-label"><span class="letter">' + (i + 1) + "</span><span>" + esc(row.label) + '</span></span><span class="bar-num">' + (r.total ? row.avg.toFixed(1) : "–") + "<small>avg. place</small></span></div>" +
@@ -187,7 +215,15 @@
     return { html: h, data: r };
   }
 
+  // Plain words for where the average sits
+  function lean(q, avg) {
+    if (avg <= 15) return "Way out by " + (q.lowLabel || "the cold pole");
+    if (avg < 40) return "Leaning toward " + (q.lowLabel || "the cold pole");
+    if (avg <= 60) return "Right in the middle";
+    if (avg < 85) return "Leaning toward " + (q.highLabel || "the hot pole");
+    return "Way out by " + (q.highLabel || "the hot pole");
+  }
   function icon(k, w) { return TYPES[k] ? TYPES[k].glyph.replace(/width="20" height="20"/, 'width="' + (w || 20) + '" height="' + (w || 20) + '"') : ""; }
   var TROPHY = '<svg class="trophy" viewBox="0 0 64 64" aria-hidden="true"><path d="M21 10H11v5a10 10 0 0 0 10 10M43 10h10v5a10 10 0 0 1-10 10" fill="none" stroke="#1B2440" stroke-width="3.5" stroke-linecap="round"/><path d="M20 6h24v17a12 12 0 0 1-24 0z" fill="#FFB547" stroke="#1B2440" stroke-width="3.5" stroke-linejoin="round"/><path d="M32 12l2.2 4.4 4.8.7-3.5 3.4.8 4.8-4.3-2.3-4.3 2.3.8-4.8-3.5-3.4 4.8-.7z" fill="#FFF4D6"/><path d="M28 35h8v8h-8z" fill="#E8892B" stroke="#1B2440" stroke-width="3.5" stroke-linejoin="round"/><rect x="19" y="43" width="26" height="9" rx="2.5" fill="#FFB547" stroke="#1B2440" stroke-width="3.5"/></svg>';
-  window.PCResults = { corrects: corrects, TROPHY: TROPHY, icon: icon, TYPES: TYPES, LETTERS: LETTERS, blank: blank, convert: convert, cleanOptions: cleanOptions, problems: problems, compute: compute, view: view, leaderboard: leaderboard, quizPoints: quizPoints, normWord: normWord, buddyName: buddyName };
+  window.PCResults = { corrects: corrects, TROPHY: TROPHY, icon: icon, TYPES: TYPES, LETTERS: LETTERS, blank: blank, convert: convert, cleanOptions: cleanOptions, problems: problems, compute: compute, view: view, leaderboard: leaderboard, quizPoints: quizPoints, normWord: normWord, buddyName: buddyName, lean: lean };
 })();

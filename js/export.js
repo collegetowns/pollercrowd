@@ -10,6 +10,8 @@
     var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
   }
+  // Blend two hex colors (for the thermometer bars)
+  function mix(a, b, t) { var A = parseInt(a, 16), Bn = parseInt(b, 16), out = 0; for (var k = 16; k >= 0; k -= 8) out |= Math.round(((A >> k) & 255) * (1 - t) + ((Bn >> k) & 255) * t) << k; return ("000000" + out.toString(16)).slice(-6).toUpperCase(); }
   function people(s) { return Object.keys(s.roster || {}).length; }
 
   /* ---------- CSV ---------- */
@@ -18,9 +20,14 @@
     var rows = [["Poller Crowd results"], ["Session", s.title], ["Date", dateStr(s.startedAt)], ["Room", s.code], ["Students", people(s)], [],
       ["Question #", "Type", "Question", "Answer / item / word", "Count", "Percent of students", "Notes"]];
     s.questions.forEach(function (q, i) {
+      if (q.type === "sl") return;
       var r = R.compute(s, q), T = R.TYPES[q.type].name, n = i + 1;
       if (q.type === "mc" || q.type === "qz") r.rows.forEach(function (x) { rows.push([n, T, q.prompt, x.letter + ". " + x.label, x.count, x.pct + "%", x.correct ? "Correct answer" : ""]); });
       if (q.type === "rs") { r.counts.forEach(function (c, j) { rows.push([n, T, q.prompt, String(j + 1), c, r.total ? Math.round(c / r.total * 100) + "%" : "0%", j === 0 ? q.lowLabel : j === r.max - 1 ? q.highLabel : ""]); }); rows.push([n, T, q.prompt, "Average", r.total ? r.avg.toFixed(2) : "", "", r.total + " responses"]); }
+      if (q.type === "th") {
+        if (r.total) { rows.push([n, T, q.prompt, "Average (0 = " + q.lowLabel + ", 100 = " + q.highLabel + ")", r.avg.toFixed(1), "", r.total + " responses"]); rows.push([n, T, q.prompt, "Median", r.median, "", "Middle half: " + r.low + " to " + r.high]); }
+        r.bins.forEach(function (c, j) { rows.push([n, T, q.prompt, (j * 5) + "–" + (j === 19 ? 100 : j * 5 + 4), c, r.total ? Math.round(c / r.total * 100) + "%" : "0%", j === 0 ? q.lowLabel : j === 19 ? q.highLabel : ""]); });
+      }
       if (q.type === "rk") r.rows.forEach(function (x, j) { rows.push([n, T, q.prompt, x.label, x.points, "", "Overall place " + (j + 1) + "; average place " + (r.total ? x.avg.toFixed(2) : "–")]); });
       if (q.type === "wc") r.words.forEach(function (w) { rows.push([n, T, q.prompt, w.text, w.count, "", ""]); });
       if (q.type === "qa") r.items.forEach(function (x) { rows.push([n, T, q.prompt, x.text, x.votes, "", x.answered ? "Answered" : ""]); });
@@ -38,7 +45,7 @@
     var body = s.questions.map(function (q, i) {
       var v = R.view(s, q, { reveal: true, limit: 50 });
       var im = q.image && PC.images.cached(q.image);
-      return '<section><p class="label">Question ' + (i + 1) + " · " + R.TYPES[q.type].name + " · " + v.data.total + (v.data.total === 1 ? " student" : " students") + "</p><h2>" + e(q.prompt) + "</h2>" +
+      return '<section><p class="label">' + (q.type === "sl" ? "Slide " + (i + 1) + " · Info slide" : "Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + v.data.total + (v.data.total === 1 ? " student" : " students")) + "</p><h2>" + e(q.prompt) + "</h2>" +
         (im ? '<img src="' + im + '" alt="' + e(q.imageAlt || "Photo for this question") + '" style="display:block;max-width:100%;max-height:300px;border-radius:12px;margin:0 0 16px">' : "") + v.html + "</section>";
     }).join("");
     var lb = R.leaderboard(s, 10);
@@ -126,7 +133,7 @@
     }
     for (var i = 0; i < s.questions.length; i++) {
       var q = s.questions[i], r = R.compute(s, q);
-      var sl = base("Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + r.total + (r.total === 1 ? " student" : " students"));
+      var sl = base(q.type === "sl" ? "Slide " + (i + 1) : "Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + r.total + (r.total === 1 ? " student" : " students"));
       sl.addText(q.prompt, { x: 0.6, y: 0.75, w: 12.1, h: 1.1, fontFace: H, fontSize: 30, bold: true, color: C.ink, valign: "top", fit: "shrink" });
       var area = { x: 0.6, y: 2.0, w: 12.1, h: 4.8 }, photo = q.image && PC.images.cached(q.image);
       if (photo) {
@@ -134,6 +141,10 @@
         var sz = await imgSize(photo), bw = 5.4, bh = 4.6, k = Math.min(bw / sz[0], bh / sz[1]), pw = sz[0] * k, ph = sz[1] * k;
         sl.addImage({ data: photo, x: 0.6 + (bw - pw) / 2, y: 2.0 + (bh - ph) / 2, w: pw, h: ph, altText: q.imageAlt || "" });
         area = { x: 6.3, y: 2.0, w: 6.4, h: 4.8 };
+      }
+      if (q.type === "sl") {
+        if (q.body) sl.addText(q.body, { x: area.x, y: area.y, w: area.w, h: 4.4, fontFace: BODY, fontSize: 24, color: C.ink, valign: "top", fit: "shrink" });
+        continue;
       }
       if (!r.total) { sl.addText("No responses", { x: area.x, y: 3.6, w: area.w, h: 0.8, fontFace: H, fontSize: 28, color: C.muted, align: "center" }); continue; }
 
@@ -153,6 +164,13 @@
         else sl.addText([{ text: "Average\n", options: { fontSize: 16, bold: true, color: C.label } }, { text: r.avg.toFixed(1), options: { fontSize: 64, bold: true, color: C.ink, fontFace: H } }, { text: "\nout of " + r.max, options: { fontSize: 16, color: C.muted } }],
           { x: 9.6, y: 2.4, w: 3.1, h: 2.6, fontFace: BODY, align: "center", valign: "middle", fill: { color: C.panel2 } });
         sl.addText("1 = " + (q.lowLabel || "") + "    " + r.max + " = " + (q.highLabel || ""), { x: area.x, y: 6.55, w: rw, h: 0.35, fontFace: BODY, fontSize: 12, color: C.muted });
+      }
+      if (q.type === "th") {
+        sl.addChart(p.ChartType.bar, [{ name: "Students", labels: r.bins.map(function (_, j) { return j % 4 === 0 ? String(j * 5) : ""; }), values: r.bins }],
+          { x: area.x, y: 2.7, w: area.w, h: 3.5, barDir: "col", chartColors: r.bins.map(function (_, j) { return mix(C.glacier, C.warm, (j + 0.5) / 20); }), showValue: false, catAxisLabelColor: C.muted, catAxisLabelFontSize: 12, valAxisHidden: true, valGridLine: { style: "none" }, barGapWidthPct: 25, showLegend: false });
+        sl.addText("Crowd average " + Math.round(r.avg) + "°  ·  " + R.lean(q, r.avg) + "  ·  middle half " + r.low + "–" + r.high + "°", { x: area.x, y: 2.0, w: area.w, h: 0.6, fontFace: H, fontSize: photo ? 18 : 24, bold: true, color: C.ink, fit: "shrink" });
+        sl.addText([{ text: "❄ 0 = " + (q.lowLabel || ""), options: { align: "left" } }], { x: area.x, y: 6.3, w: area.w / 2, h: 0.4, fontFace: BODY, fontSize: 14, bold: true, color: C.muted });
+        sl.addText("100 = " + (q.highLabel || "") + " 🔥", { x: area.x + area.w / 2, y: 6.3, w: area.w / 2, h: 0.4, fontFace: BODY, fontSize: 14, bold: true, color: C.muted, align: "right" });
       }
       if (q.type === "rk") {
         var rows = [[{ text: "Place", options: { bold: true, color: C.label } }, { text: "Item", options: { bold: true, color: C.label } }, { text: "Average place", options: { bold: true, color: C.label } }]]

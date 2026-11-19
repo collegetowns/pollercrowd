@@ -62,20 +62,40 @@
       ]
     };
   }
+  var SAMPLE_WELCOME = { prompt: "Welcome to Earth Science 101!", body: "Grab your phone and scan the code to join.\nPick a buddy, then look up here. We’ll start in a minute." };
+  var SAMPLE_THERM = { prompt: "How much of Earth’s surface do you think is covered by water?", lowLabel: "None of it", highLabel: "All of it" };
+  var SAMPLE_BREAK = { prompt: "Two-minute stretch break", body: "Stand up, stretch, refill your water. Back in two!", timer: 120 };
   function sampleDeck() {
     var q = function (type, o) { return Object.assign(R.blank(type), o); };
     return {
       id: PC.uid(8), title: "Sample: Earth Science 101", updated: Date.now(), questions: [
+        q("sl", SAMPLE_WELCOME),
         q("rs", { prompt: "How awake are you right now?", scaleMax: 5, lowLabel: "Still asleep", highLabel: "Wide awake" }),
         q("wc", { prompt: "In one word, what is the atmosphere?", maxWords: 3 }),
+        q("th", SAMPLE_THERM),
         q("mc", { prompt: "Which layer of the atmosphere do we live in?", options: ["Troposphere", "Stratosphere", "Mesosphere", "Thermosphere"], correct: 0 }),
         q("qz", { prompt: "Which gas makes up most of the air we breathe?", options: ["Oxygen", "Nitrogen", "Carbon dioxide", "Argon"], correct: 1, timer: 20 }),
         q("rk", { prompt: "Rank these layers from lowest to highest.", options: ["Stratosphere", "Troposphere", "Thermosphere", "Mesosphere"] }),
+        q("sl", SAMPLE_BREAK),
         q("qa", { prompt: "What's still foggy about today's lecture?" })
       ]
     };
   }
   if (!PC.store.get("seeded")) { Store.saveDeck(sampleDeck()); PC.store.set("seeded", true); }
+  // Older copies of the sample set get the new info slides and thermometer question
+  if (!PC.store.get("sampleV3")) {
+    Store.decks().filter(function (d) { return d.title === "Sample: Earth Science 101"; }).forEach(function (d) {
+      var x = Store.deck(d.id); if (!x || x.questions.some(function (q) { return q.type === "th" || q.type === "sl"; })) return;
+      var mk = function (type, o) { return Object.assign(R.blank(type), o); };
+      x.questions.unshift(mk("sl", SAMPLE_WELCOME));
+      var at = x.questions.findIndex(function (q) { return q.type === "wc"; });
+      x.questions.splice(at >= 0 ? at + 1 : x.questions.length, 0, mk("th", SAMPLE_THERM));
+      var qa = x.questions.findIndex(function (q) { return q.type === "qa"; });
+      x.questions.splice(qa >= 0 ? qa : x.questions.length, 0, mk("sl", SAMPLE_BREAK));
+      Store.saveDeck(x);
+    });
+    PC.store.set("sampleV3", true);
+  }
   if (!PC.store.get("sampleRace")) { Store.saveDeck(sampleRace()); PC.store.set("sampleRace", true); }
   // Give the sample set a photo so every feature is there to try
   if (!PC.store.get("samplePhoto")) {
@@ -195,6 +215,7 @@
     if (pb) { if (bad) pb.textContent = bad + (bad === 1 ? " question needs" : " questions need") + " a little more before you present. Look for the ⚠ marks."; else pb.remove(); }
   }
   var TIMERS_MC = [[0, "No timer"], [15, "15 seconds"], [30, "30 seconds"], [60, "1 minute"], [90, "90 seconds"]];
+  var TIMERS_SL = [[0, "No countdown"], [60, "1 minute"], [120, "2 minutes"], [180, "3 minutes"], [300, "5 minutes"], [600, "10 minutes"], [900, "15 minutes"]];
   var TIMERS_QZ = [[10, "10 seconds"], [15, "15 seconds"], [20, "20 seconds"], [30, "30 seconds"], [45, "45 seconds"], [60, "1 minute"]];
   function sel(name, list, val) { return '<select class="input" data-f="' + name + '">' + list.map(function (o) { return '<option value="' + o[0] + '"' + (String(o[0]) === String(val) ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>"; }
   function renderQEdit() {
@@ -207,7 +228,8 @@
     h += '<fieldset><legend class="sr">Activity type</legend><div class="types">' + Object.keys(T).map(function (k) {
       return '<button type="button" class="type-btn" data-act="q-type" data-type="' + k + '" aria-pressed="' + (q.type === k) + '"><span class="g">' + T[k].glyph + "</span><span>" + T[k].name + '<br><small class="muted">' + T[k].hint + "</small></span></button>";
     }).join("") + "</div></fieldset>";
-    h += '<label class="field"><span>Your question</span><textarea class="input" data-f="prompt" rows="2" maxlength="200" style="font:600 22px var(--display)">' + esc(q.prompt) + "</textarea></label>";
+    h += '<label class="field"><span>' + (q.type === "sl" ? "Slide title" : "Your question") + '</span><textarea class="input" data-f="prompt" rows="2" maxlength="200" style="font:600 22px var(--display)"' + (q.type === "sl" ? ' placeholder="e.g. Welcome! or Stretch break"' : "") + ">" + esc(q.prompt) + "</textarea></label>";
+    if (q.type === "sl") h += '<label class="field"><span>Extra text <span class="muted">(optional)</span></span><textarea class="input" data-f="body" rows="3" maxlength="500" placeholder="Instructions, a quote, what’s coming up next…">' + esc(q.body || "") + "</textarea></label>";
     var src = PC.images.cached(q.image);
     h += q.image ? '<div class="photo-edit"><img class="photo-thumb" src="' + (src || "") + '" alt=""><div class="stack-16" style="gap:8px;flex:1;min-width:220px"><label class="field"><span>Describe the photo <span class="muted">(for screen readers)</span></span><input class="input" data-f="imageAlt" maxlength="160" placeholder="e.g. Diagram of the layers of the atmosphere" value="' + esc(q.imageAlt || "") + '"></label>' +
       '<div class="controls"><button type="button" class="btn small" data-act="photo-add">Replace photo</button><button type="button" class="btn small danger" data-act="photo-del">Remove photo</button></div></div></div>'
@@ -230,6 +252,9 @@
     if (q.type === "qa") h += '<label class="check"><input type="checkbox" data-f="moderate"' + (q.moderate ? " checked" : "") + '> Hold questions for my approval before they show</label><p class="note">Students can ask up to 3 questions and upvote each other’s.</p>';
     if (q.type === "rs") h += '<label class="field"><span>Scale</span>' + sel("scaleMax", [[5, "1 to 5"], [10, "1 to 10"]], q.scaleMax) + '</label><span></span><label class="field"><span>Label for 1</span><input class="input" data-f="lowLabel" value="' + esc(q.lowLabel) + '" maxlength="30"></label><label class="field"><span>Label for ' + q.scaleMax + '</span><input class="input" data-f="highLabel" value="' + esc(q.highLabel) + '" maxlength="30"></label>';
     if (q.type === "rk") h += '<p class="note">Students put the items in order on their phones. Results show the average place of each item.</p>';
+    if (q.type === "th") h += '<label class="field"><span>❄ Cold pole <span class="muted">(left end)</span></span><input class="input" data-f="lowLabel" value="' + esc(q.lowLabel || "") + '" maxlength="40" placeholder="e.g. Totally disagree"></label><label class="field"><span>🔥 Hot pole <span class="muted">(right end)</span></span><input class="input" data-f="highLabel" value="' + esc(q.highLabel || "") + '" maxlength="40" placeholder="e.g. Totally agree"></label>' +
+      '<p class="note" style="grid-column:1/-1">Students slide a marker along a thermometer to show where they think it sits between the two poles. The big screen shows where the class landed and the crowd average.</p>';
+    if (q.type === "sl") h += '<label class="field"><span>Countdown</span>' + sel("timer", TIMERS_SL, q.timer || 0) + '</label><p class="note" style="align-self:end">Nothing to answer here. Use it for a welcome screen, instructions or a break. Phones show the title and point students to the big screen.</p>';
     h += "</div>";
     var p = R.problems(q);
     h += p.length ? '<div class="banner warn" id="qprob">⚠ ' + p.join(" ") + "</div>" : "";
@@ -462,6 +487,8 @@
     if (q.type === "mc") d.q.multi = !!q.multi;
     if (q.type === "wc") d.q.maxWords = q.maxWords || 1;
     if (q.type === "rs") { d.q.scaleMax = q.scaleMax; d.q.lowLabel = q.lowLabel; d.q.highLabel = q.highLabel; }
+    if (q.type === "th") { d.q.lowLabel = q.lowLabel; d.q.highLabel = q.highLabel; }
+    if (q.type === "sl") { d.q.body = q.body || ""; if (st.openedAt && !st.open && q.timer) d.q.done = 1; }
     if (q.timer) d.q.timer = q.timer;
     if (q.image) d.q.photo = 1;
     d.q.started = !!st.openedAt;
@@ -551,6 +578,7 @@
     if (m.q !== q.id) return;
     var A = s.answers[q.id] || (s.answers[q.id] = {});
     if (m.t === "ans") {
+      if (q.type === "sl") return;
       if (!st.open || (st.endsAt && now > st.endsAt + 1500)) return;
       var val = m.v, n = (q.options || []).length;
       if (q.type === "mc") {
@@ -563,6 +591,9 @@
         A[pub] = { c: val, ms: ms, pts: R.quizPoints(q, val, ms) };
       } else if (q.type === "rs") {
         if (!Number.isInteger(val) || val < 1 || val > (q.scaleMax || 5)) return;
+        A[pub] = val;
+      } else if (q.type === "th") {
+        if (!Number.isInteger(val) || val < 0 || val > 100) return;
         A[pub] = val;
       } else if (q.type === "rk") {
         if (!Array.isArray(val) || val.length !== n) return;
@@ -628,13 +659,16 @@
     var s = live.s, q = curQ(), st = curSt(), T = R.TYPES[q.type];
     var ctrl = [];
     ctrl.push('<button type="button" class="btn" data-act="prev"' + (s.qi === 0 ? " disabled" : "") + '>← Back</button>');
-    if (needsStart(q) && !st.openedAt) ctrl.push('<button type="button" class="btn primary" data-act="start">' + (q.type === "qz" ? "Start the " + (q.timer || 20) + "-second race" : "Start the " + q.timer + "-second timer") + "</button>");
+    if (q.type === "sl") {
+      if (q.timer) ctrl.push('<button type="button" class="btn' + (st.openedAt ? "" : " primary") + '" data-act="start">' + (st.openedAt ? "Restart the countdown" : "Start the " + fmtDur(q.timer) + " countdown") + "</button>");
+    }
+    else if (needsStart(q) && !st.openedAt) ctrl.push('<button type="button" class="btn primary" data-act="start">' + (q.type === "qz" ? "Start the " + (q.timer || 20) + "-second race" : "Start the " + q.timer + "-second timer") + "</button>");
     else if (!st.revealed) ctrl.push('<button type="button" class="btn" data-act="toggle-open">' + (st.open ? "Close answers" : "Reopen answers") + "</button>");
-    if (q.type !== "qz") ctrl.push('<button type="button" class="btn" data-act="toggle-results">' + (st.hideResults ? "Show results" : "Hide results") + "</button>");
+    if (q.type !== "qz" && q.type !== "sl") ctrl.push('<button type="button" class="btn" data-act="toggle-results">' + (st.hideResults ? "Show results" : "Hide results") + "</button>");
     if ((q.type === "mc" && R.corrects(q).length) || q.type === "qz") ctrl.push('<button type="button" class="btn' + (st.revealed ? "" : " solid") + '" data-act="reveal"' + (q.type === "qz" && !st.openedAt ? " disabled" : "") + ">" + (st.revealed ? "Hide answer" : "Reveal answer") + "</button>");
     ctrl.push('<button type="button" class="btn primary" data-act="next">' + (s.qi === s.questions.length - 1 ? (hasQuiz(s) && !s.podiumShown ? "Show the podium →" : "Finish") : "Next →") + "</button>");
-    box.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center"><span class="label">Question ' + (s.qi + 1) + " of " + s.questions.length + " · " + T.name +
-      '</span><span class="chip" id="statusChip"></span></div><h1 class="q-title">' + esc(q.prompt) + "</h1></div>" +
+    box.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center"><span class="label">' + (q.type === "sl" ? "Slide · " + (s.qi + 1) + " of " + s.questions.length : "Question " + (s.qi + 1) + " of " + s.questions.length + " · " + T.name) +
+      '</span><span class="chip" id="statusChip"></span></div><h1 class="q-title' + (q.type === "sl" ? " slide-title" : "") + '">' + esc(q.prompt) + "</h1></div>" +
       (q.image ? '<div class="q-body"><figure class="q-media"><button type="button" class="photo-btn" data-act="photo-zoom" aria-label="Show the photo larger"><img src="' + (PC.images.cached(q.image) || "") + '" alt="' + esc(q.imageAlt || "Photo for this question") + '"></button></figure><div id="resultsArea" aria-live="polite"></div></div>' : '<div id="resultsArea" aria-live="polite"></div>') +
       '<div class="controls" id="ctrl">' + ctrl.join("") + "</div>" +
       '<div class="crowd-row"><span class="label" id="crowdLabel">In the igloo · 0</span><div class="crowd" id="crowd"></div></div>';
@@ -643,6 +677,13 @@
   function renderResultsArea() {
     var el = $("#resultsArea"); if (!el || !live || live.s.podium || live.s.mode === "self") return;
     var s = live.s, q = curQ(), st = curSt();
+    if (q.type === "sl") {
+      el.innerHTML = '<div class="stack-16" style="gap:22px">' + R.view(s, q).html + (q.timer ? '<div class="big-timer" id="bigTimer"><span class="label">' + (st.openedAt ? (st.open ? "Back in" : "Time’s up!") : "Countdown") + "</span><b>" + fmtClock(st.open && st.endsAt ? st.endsAt - Date.now() : st.openedAt ? 0 : q.timer * 1000) + "</b></div>" : "") +
+        (q.body || q.timer || q.image ? "" : '<p class="muted" style="font-size:20px">Phones are showing this title too. Press Next when you’re ready.</p>') + "</div>";
+      var bt = $("#bigTimer"); if (bt && st.openedAt && !st.open) bt.classList.add("done");
+      var sc = $("#statusChip"); if (sc) sc.innerHTML = '<span class="dot off"></span>Info slide · nothing to answer<span id="timerTxt"></span>';
+      return;
+    }
     var r = R.view(s, q, { controls: true });
     var n = r.data.total, label = q.type === "wc" ? r.data.entries + (r.data.entries === 1 ? " word" : " words") + " from " + n : q.type === "qa" ? r.data.items.length + (r.data.items.length === 1 ? " question" : " questions") : n + (n === 1 ? " answer" : " answers");
     if (needsStart(q) && !st.openedAt) el.innerHTML = '<div class="frozen"><h3>Get ready…</h3><p class="muted">Press Start when everyone’s in.' + (q.type === "qz" ? " Faster correct answers score more." : " Students get " + q.timer + " seconds.") + "</p></div>";
@@ -659,9 +700,12 @@
   function optionCards(q) {
     return '<div class="optgrid">' + q.options.map(function (o, i) { return '<div class="optcard"><span class="letter">' + R.LETTERS[i] + "</span><span>" + esc(o) + "</span></div>"; }).join("") + "</div>";
   }
+  function fmtClock(ms) { var t = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); }
+  function fmtDur(sec) { return sec < 60 ? sec + "-second" : (sec / 60) + "-minute"; }
   function paintTimer() {
     var t = $("#timerTxt"); if (!t || !live) return;
-    var st = curSt(); t.textContent = st.open && st.endsAt ? " · " + Math.max(0, Math.ceil((st.endsAt - Date.now()) / 1000)) + "s" : "";
+    var st = curSt();
+    if (curQ().type === "sl") { var bt = $("#bigTimer b"); if (bt && st.open && st.endsAt) bt.textContent = fmtClock(st.endsAt - Date.now()); t.textContent = ""; return; } t.textContent = st.open && st.endsAt ? " · " + Math.max(0, Math.ceil((st.endsAt - Date.now()) / 1000)) + "s" : "";
   }
   function paintConn() {
     var c = $("#connChip"); if (!c || !live) return;
@@ -740,7 +784,7 @@
       s.questions.map(function (q, i) {
         var v = R.view(s, q, { reveal: true, limit: 100 });
         var im = q.image && PC.images.cached(q.image);
-        return '<section class="card stack-16"><span class="label">Question ' + (i + 1) + " · " + R.TYPES[q.type].name + " · " + (v.data.total) + (v.data.total === 1 ? " student" : " students") + '</span><h2 style="font-size:28px">' + esc(q.prompt) + "</h2>" +
+        return '<section class="card stack-16"><span class="label">' + (q.type === "sl" ? "Slide " + (i + 1) + " · Info slide" : "Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + (v.data.total) + (v.data.total === 1 ? " student" : " students")) + '</span><h2 style="font-size:28px">' + esc(q.prompt) + "</h2>" +
           (im ? '<img class="photo-result" src="' + im + '" alt="' + esc(q.imageAlt || "Photo for this question") + '">' : "") + v.html + "</section>";
       }).join("") +
       (hasQuiz ? '<section class="card stack-16"><h2>Final quiz leaderboard</h2>' + (R.leaderboard(s, 10).map(function (x) { return '<div class="leader"><span class="rank">' + x.rank + "</span>" + B.svg(x.k, x.v, x.l, 44) + '<span class="who">' + esc(R.buddyName(x)) + '</span><span class="pts">' + x.pts + "</span></div>"; }).join("") || '<p class="muted">No quiz answers were revealed.</p>') + "</section>" : "") +

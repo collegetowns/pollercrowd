@@ -278,3 +278,32 @@ legend { padding: 0; margin-bottom: 8px; font-weight: 800; }
 .race-dots i.ok { background: var(--live); border-color: var(--live); }
 .race-dots i.no { background: var(--danger); border-color: var(--danger); }
 .race-dots i.wait { background: var(--glacier); border-color: var(--glacier); }
+
+/* Thermometer */
+.therm { display: flex; flex-direction: column; gap: 10px; margin-top: 30px; }
+.therm-cols { display: flex; align-items: flex-end; gap: 4px; height: 190px; }
+.therm-cols .tcol { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.therm-cols .tbar { width: 100%; min-height: 3px; border-radius: 8px 8px 2px 2px; display: flex; justify-content: center; transition: height .5s; }
+.therm-cols .tbar b { font: 600 15px var(--display); color: var(--ink); transform: translateY(-22px); }
+.therm-track { position: relative; height: 22px; border-radius: 999px; background: linear-gradient(90deg, var(--glacier), color-mix(in srgb, var(--warm) 50%, var(--glacier)), var(--warm)); box-shadow: inset 0 0 0 2px var(--border2); }
+.therm-pin { position: absolute; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: var(--ink); border: 4px solid var(--bg); box-shadow: 0 2px 8px rgba(0,0,0,.25); transition: left .5s; }
+.therm-pin span { position: absolute; top: 36px; left: 50%; transform: translateX(-50%); white-space: nowrap; font: 600 18px var(--display); color: var(--ink); }
+.therm-ends { display: flex; justify-content: space-between; gap: 12px; font-weight: 800; margin-top: 18px; }
+.therm-ends span:last-child { text-align: right; }
+/* phone thermometer */
+.th-pick { display: flex; flex-direction: column; gap: 14px; padding: 18px 16px; border-radius: 22px; background: var(--panel); }
+.th-val { text-align: center; font: 600 44px var(--display); line-height: 1; }
+.th-val small { display: block; font: 700 14px var(--body); color: var(--muted); margin-top: 6px; }
+.th-range { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; border-radius: 999px; background: linear-gradient(90deg, var(--glacier), var(--warm)); box-shadow: inset 0 0 0 2px var(--border2); margin: 10px 0; touch-action: none; }
+.th-range::-webkit-slider-thumb { -webkit-appearance: none; width: 44px; height: 44px; border-radius: 50%; background: var(--ink); border: 5px solid var(--panel); box-shadow: 0 2px 8px rgba(0,0,0,.3); cursor: grab; }
+.th-range::-moz-range-thumb { width: 34px; height: 34px; border-radius: 50%; background: var(--ink); border: 5px solid var(--panel); box-shadow: 0 2px 8px rgba(0,0,0,.3); cursor: grab; }
+.th-range:focus-visible { outline: 3px solid var(--warm); outline-offset: 4px; }
+.th-range:disabled { opacity: .55; }
+.th-ends { display: flex; justify-content: space-between; gap: 10px; font-weight: 800; font-size: 15px; }
+.th-ends span:last-child { text-align: right; }
+
+/* Info slide */
+.slide-body { font-size: clamp(20px, 2.3vw, 34px); font-weight: 700; line-height: 1.4; color: var(--ink); white-space: normal; margin: 0; }
+.big-timer { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 34px; border-radius: 26px; background: var(--panel2); align-self: flex-start; }
+.big-timer b { font: 600 clamp(56px, 8vw, 120px) var(--display); line-height: 1; font-variant-numeric: tabular-nums; }
+.big-timer.done b { color: var(--warm-text); }

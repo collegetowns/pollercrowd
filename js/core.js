@@ -135,9 +135,29 @@
 
   /* ---------- server settings ---------- */
   // Which server a page uses: the site's own (config.js), a teacher's own Supabase (Settings), or demo.
+  // Firebase Realtime Database URLs look like https://NAME-default-rtdb.firebaseio.com
+  // or https://NAME-default-rtdb.REGION.firebasedatabase.app
+  PC.fbUrlOk = function (u) { return /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.(firebaseio\.com|firebasedatabase\.app)$/.test(String(u || "")); };
+  PC.cleanFbUrl = function (u) { return String(u || "").trim().replace(/\/+$/, "").replace(/^http:/, "https:").toLowerCase(); };
   PC.server = {
-    site: function () { return CFG.supabaseUrl && CFG.supabaseKey ? { mode: "supabase", url: CFG.supabaseUrl.replace(/\/+$/, ""), key: CFG.supabaseKey, own: false } : null; },
-    own: function () { var o = PC.store.get("ownServer", null); return o && o.url && o.key ? { mode: "supabase", url: o.url.replace(/\/+$/, ""), key: o.key, own: true } : null; },
+    site: function () {
+      if (CFG.supabaseUrl && CFG.supabaseKey) return { mode: "supabase", url: CFG.supabaseUrl.replace(/\/+$/, ""), key: CFG.supabaseKey, own: false };
+      if (CFG.firebaseUrl && PC.fbUrlOk(PC.cleanFbUrl(CFG.firebaseUrl))) return { mode: "firebase", url: PC.cleanFbUrl(CFG.firebaseUrl), own: false };
+      return null;
+    },
+    own: function () {
+      var o = PC.store.get("ownServer", null); if (!o) return null;
+      if (o.type === "firebase") return PC.fbUrlOk(o.fbUrl) ? { mode: "firebase", url: o.fbUrl, own: true } : null;
+      return o.url && o.key ? { mode: "supabase", url: o.url.replace(/\/+$/, ""), key: o.key, own: true } : null;
+    },
+    // What a saved session remembers about its server, and back again
+    save: function (srv) { return srv.mode === "demo" ? "demo" : !srv.own ? "site" : srv.mode === "firebase" ? { type: "firebase", url: srv.url } : { url: srv.url, key: srv.key }; },
+    load: function (x) {
+      if (x === "demo") return { mode: "demo" };
+      if (x === "site" || !x) return PC.server.site() || { mode: "demo" };
+      if (x.type === "firebase") return { mode: "firebase", url: x.url, own: true };
+      return { mode: "supabase", url: x.url, key: x.key, own: true };
+    },
     current: function () {
       var choice = PC.store.get("serverChoice", "site");
       if (choice === "demo") return { mode: "demo" };
@@ -146,11 +166,13 @@
     },
     // Short form for links: a *.supabase.co project becomes just its ref
     pack: function (srv) {
+      if (srv && srv.mode === "firebase" && srv.own) return { s: "fb:" + srv.url.replace(/^https:\/\//, "") };
       if (!srv || srv.mode !== "supabase" || !srv.own) return null;
       var m = /^https:\/\/([a-z0-9]{8,40})\.supabase\.co$/.exec(srv.url);
       return { s: m ? m[1] : srv.url, k: srv.key };
     },
     unpack: function (s, k) {
+      if (s && /^fb:/.test(s)) { var fu = PC.cleanFbUrl("https://" + s.slice(3)); return PC.fbUrlOk(fu) ? { mode: "firebase", url: fu, own: true } : null; }
       if (!s || !k) return null;
       var url = /^[a-z0-9]{8,40}$/.test(s) ? "https://" + s + ".supabase.co" : s;
       if (!/^https:\/\//.test(url)) return null;
@@ -175,7 +197,7 @@
     return clients[k];
   }
   PC.connect = function (srv) {
-    return srv.mode === "supabase" ? supabaseConn(srv) : demoConn();
+    return srv.mode === "supabase" ? supabaseConn(srv) : srv.mode === "firebase" ? firebaseConn(srv) : demoConn();
   };
   function topic(code, part) { return "pc-" + String(code).toLowerCase() + "-" + part; }
 
@@ -218,6 +240,84 @@
       }
     };
   }
+  /* Firebase Realtime Database. The SDK loads only when a room uses Firebase.
+     Layout: pc/<room>/s/<id> = latest signed state from the teacher (older ones are removed)
+             pc/<room>/m/<id> = messages from phones; the teacher reads and deletes each one
+     Everything is stored as a JSON string in "j" so any message shape is allowed. */
+  var fbLoading = null, fbApps = {};
+  function loadScript(src) {
+    return new Promise(function (res, rej) { var el = document.createElement("script"); el.src = src; el.onload = res; el.onerror = function () { rej(new Error("Couldn’t load " + src)); }; document.head.appendChild(el); });
+  }
+  PC.loadFirebase = function () {
+    if (window.firebase && window.firebase.database) return Promise.resolve();
+    if (!fbLoading) fbLoading = loadScript("vendor/firebase-app.js").then(function () { return loadScript("vendor/firebase-database.js"); })
+      .catch(function (e) { fbLoading = null; throw e; });
+    return fbLoading;
+  };
+  function fbDb(url) {
+    if (!fbApps[url]) fbApps[url] = window.firebase.initializeApp({ databaseURL: url }, "pc" + Object.keys(fbApps).length);
+    return fbApps[url].database();
+  }
+  function fbPack(msg) { return { j: JSON.stringify(msg), t: window.firebase.database.ServerValue.TIMESTAMP }; }
+  function firebaseConn(srv) {
+    var db = null, base = null, h = {}, role = null, closed = false, listeners = [], lastState = null;
+    var ready = PC.loadFirebase().then(function () { db = fbDb(srv.url); });
+    function status(st, d) { if (closed) return; if (h.onStatus) h.onStatus(st, d); if (h.onHostStatus) h.onHostStatus(st, d); }
+    function listen(ref, ev, fn) { ref.on(ev, fn, function (err) { status("CHANNEL_ERROR", err); }); listeners.push([ref, ev, fn]); }
+    return {
+      mode: "firebase",
+      join: function (code, r, handlers) {
+        h = handlers || {}; role = r;
+        ready.then(function () {
+          if (closed) return;
+          base = db.ref("pc/" + String(code).toLowerCase());
+          var up = false, timer = setTimeout(function () { if (!up) status("TIMED_OUT"); }, 15000);
+          listen(db.ref(".info/connected"), "value", function (snap) {
+            if (snap.val() === true) {
+              up = true; clearTimeout(timer);
+              if (role === "teacher") base.onDisconnect().remove(); // tidy up if the teacher's tab closes
+              status("SUBSCRIBED");
+            } else if (up) status("CLOSED");
+          });
+          if (role === "teacher") {
+            // Clear states left by an earlier visit, then read and delete phone messages as they arrive
+            base.child("s").once("value").then(function (snap) { var u = {}; snap.forEach(function (c) { u[c.key] = null; }); if (Object.keys(u).length) return base.child("s").update(u); }).catch(function () {});
+            listen(base.child("m"), "child_added", function (snap) {
+              var v = snap.val(); snap.ref.remove().catch(function () {});
+              if (v && typeof v.j === "string" && h.onMessage) { try { h.onMessage(JSON.parse(v.j)); } catch (e) {} }
+            });
+          } else {
+            listen(base.child("s").limitToLast(1), "child_added", function (snap) {
+              var v = snap.val();
+              if (v && typeof v.j === "string" && h.onState) { try { h.onState(JSON.parse(v.j)); } catch (e) {} }
+            });
+          }
+        }, function (e) { status("CHANNEL_ERROR", e); });
+      },
+      broadcast: function (msg) {
+        if (!base) return Promise.resolve("error");
+        var ref = base.child("s").push(), prev = lastState; lastState = ref;
+        return ref.set(fbPack(msg)).then(function () { if (prev) prev.remove().catch(function () {}); return "ok"; }, function () { return "error"; });
+      },
+      toHost: async function (msg) {
+        await ready;
+        if (!base) throw new Error("not joined");
+        await base.child("m").push(fbPack(msg));
+        return true;
+      },
+      close: function () {
+        closed = true;
+        listeners.forEach(function (l) { try { l[0].off(l[1], l[2]); } catch (e) {} });
+        if (base && role === "teacher") { try { base.onDisconnect().cancel(); base.remove().catch(function () {}); } catch (e) {} }
+      }
+    };
+  }
+  PC.firebaseRules = JSON.stringify({ rules: { pc: { $room: {
+    ".read": true, ".write": "!newData.exists()",
+    s: { $id: { ".write": true, ".validate": "newData.child('j').isString() && newData.child('j').val().length < 100000" } },
+    m: { $id: { ".write": "!data.exists() || !newData.exists()", ".validate": "newData.child('j').isString() && newData.child('j').val().length < 8000" } }
+  } } } }, null, 2);
+
   // Demo mode: every tab of this browser on this site shares messages. Good for trying the app.
   function demoConn() {
     var room = null, host = null;
@@ -238,6 +338,7 @@
   }
   // Settings > Test connection
   PC.testServer = function (srv) {
+    if (srv.mode === "firebase") return testFirebase(srv);
     return new Promise(function (resolve) {
       if (!/^https:\/\/.+/.test(srv.url || "")) return resolve({ ok: false, why: "The Project URL should start with https://" });
       var sb, ch, done = false;
@@ -253,6 +354,21 @@
       });
     });
   };
+
+  function testFirebase(srv) {
+    return new Promise(function (resolve) {
+      if (!PC.fbUrlOk(srv.url)) return resolve({ ok: false, why: "That doesn’t look like a Realtime Database URL. It should look like https://your-project-default-rtdb.firebaseio.com (copy it from the top of the Data tab)." });
+      var done = false, t = setTimeout(function () { finish({ ok: false, why: "No answer after 15 seconds. Check the URL. On the free plan, it may also mean 100 devices are already connected." }); }, 15000);
+      function finish(r) { if (done) return; done = true; clearTimeout(t); resolve(r); }
+      PC.loadFirebase().then(function () {
+        var ref = fbDb(srv.url).ref("pc/test-" + PC.uid(6).toLowerCase() + "/m").push();
+        return ref.set(fbPack({ t: "test" })).then(function () { return ref.remove(); });
+      }).then(function () { finish({ ok: true }); }, function (e) {
+        var m = String(e && (e.code || e.message) || e);
+        finish({ ok: false, why: /permission/i.test(m) ? "Connected, but your database rules don’t allow Poller Crowd yet. Paste the rules from the setup guide into Realtime Database → Rules and press Publish." : "Couldn’t connect (" + m + ")." });
+      });
+    });
+  }
 
   /* ---------- teacher keys & room codes ---------- */
   var WORDS = ["IGLOO", "FROST", "FLAKE", "POLAR", "CHILL", "NORTH", "SLEET", "ICICLE", "TUNDRA", "AURORA", "SLED", "MITTEN",
@@ -310,7 +426,7 @@
   PC.siteBase = function () { return location.href.replace(/[?#].*$/, "").replace(/[^/]*$/, ""); };
   PC.joinUrl = function (code, fp, srv) {
     var u = PC.siteBase() + "join.html?r=" + encodeURIComponent(code) + "&f=" + encodeURIComponent(fp);
-    var p = PC.server.pack(srv); if (p) u += "&s=" + encodeURIComponent(p.s) + "&k=" + encodeURIComponent(p.k);
+    var p = PC.server.pack(srv); if (p) u += "&s=" + encodeURIComponent(p.s) + (p.k ? "&k=" + encodeURIComponent(p.k) : "");
     if (srv && srv.mode === "demo") u += "&demo=1";
     return u;
   };

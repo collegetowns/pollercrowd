@@ -8,6 +8,9 @@
 - **Rude-word filter:** common swear words and slurs become `#!*&`. Teachers can also hold answers for approval, hide anything, and remove a student.
 - **Exports:** PowerPoint (a slide per question), a printable summary (save as PDF), and a spreadsheet (CSV).
 - **Private by design:** nothing is stored on a server. Question sets and results stay in the teacher's browser.
+- **Bring your own free connection:** Supabase (200 at once) or Firebase (100 at once), pasted into Settings on the live site or set once in `js/config.js` for your own copy.
+
+> **Setting this up with an AI assistant?** Point it at [`AGENTS.md`](AGENTS.md). It has step-by-step instructions written for assistants like Claude, ChatGPT or Copilot, for both connecting a free project and hosting your own copy. Teachers can copy a ready-made message from [`setup.html`](https://pollercrowd.collegetowns.org/setup.html#ai).
 
 ---
 
@@ -18,10 +21,11 @@
 | `index.html` | Landing page: students type a room code, teachers open the teacher screen |
 | `host.html` | The teacher screen (build question sets, present, results, exports) |
 | `join.html` | The student phone screen (the QR code points here) |
-| `setup.html` | Guide for teachers who want to connect their own free Supabase project |
+| `setup.html` | Guide for teachers: connect their own free Supabase or Firebase, host a copy, or let an AI assistant walk them through it |
+| `AGENTS.md` | Setup instructions written for AI assistants |
 | `privacy.html` | Plain-language privacy page |
-| `js/config.js` | **The only file you edit:** your Supabase keys, GoatCounter code, feedback email |
-| `js/`, `css/`, `fonts/`, `vendor/` | The app itself, its fonts and three bundled libraries (Supabase, PptxGenJS, QR code) |
+| `js/config.js` | **The only file you edit:** your Supabase keys (or Firebase URL), GoatCounter code, feedback email |
+| `js/`, `css/`, `fonts/`, `vendor/` | The app itself, its fonts and bundled libraries (Supabase, Firebase, PptxGenJS, QR code) |
 
 There's no build step. It's plain HTML, CSS and JavaScript, so you can host it anywhere that serves files.
 
@@ -47,6 +51,8 @@ Supabase passes the answers from phones to the projector in real time. Poller Cr
 4. Leave **Realtime → Settings → Allow public access** turned on. It's on by default.
 
 These two values are public by design. They are meant to sit in a web page. **Never** use the `secret` or `service_role` key.
+
+**Prefer Firebase?** Its free Spark plan allows 100 devices at once and never pauses. Create a project at [console.firebase.google.com](https://console.firebase.google.com), open **Databases & Storage → Realtime Database → Create database** (locked mode), paste the rules from [`setup.html`](setup.html#firebase) or [`AGENTS.md`](AGENTS.md) into the **Rules** tab and publish, then copy the database URL from the **Data** tab. In Step 3, put it in `firebaseUrl` and leave the two Supabase lines empty.
 
 ## Step 3. Edit `js/config.js`
 
@@ -92,12 +98,14 @@ Before each class, glance at the green **Live** chip at the top of the teacher s
 | Project pausing | after about a week unused | Open the Supabase dashboard and press **Restore** before class |
 | Active free projects | 2 per account | |
 
-**Lots of teachers using your site at once?** Each teacher can connect their **own** free Supabase project in **Settings** (the gear icon on the teacher screen). Their rooms then run on their project with their own 200-student allowance, and the QR code tells phones where to connect. The step-by-step guide for them is `setup.html`, linked from the landing page and from Settings. Rooms on a teacher's own project need the QR code or link; the room code alone points to your shared project.
+With Firebase instead: 100 devices at once (a hard cap on the free plan, including the teacher's screen), no pausing, and 10 GB of downloads a month. A room's live update is usually a few KB, so normal class use stays far below that.
+
+**Lots of teachers using your site at once?** Each teacher can connect their **own** free Supabase project in **Settings** (the gear icon on the teacher screen). Their rooms then run on their project with their own allowance (200 on Supabase, 100 on Firebase), and the QR code tells phones where to connect. The step-by-step guide for them is `setup.html`, linked from the landing page and from Settings. Rooms on a teacher's own project need the QR code or link; the room code alone points to your shared project.
 
 ## How it works (for the curious)
 
 - The teacher screen makes a fresh **signing key** for each room, and the room code (e.g. `IGLOO-482`) is derived from that key. Every update the phones receive is signed. A prankster who sends fake "the quiz is over" messages gets ignored, because phones check the signature.
-- Phones send answers **only to the teacher's screen** (over Supabase's HTTP broadcast), so classmates never see each other's raw answers, and message counts stay low.
+- Phones send answers to the teacher's screen as separate messages (Supabase HTTP broadcast, or a short-lived entry the teacher's screen reads and deletes on Firebase). Phones only listen for the teacher's signed updates, so message counts stay low.
 - Each phone has a random private ID. The teacher's screen only ever sees a one-way hash of it, which is how "one answer per phone", the buddy patterns and **Remove** work, without names.
 - Question sets and results are saved in the teacher's browser (`localStorage`). Finished sessions are deleted after 30 days (`keepSessionsDays` in `config.js`). **Download** a question set to back it up, or to share it with a colleague, who can **Import** it.
 
@@ -107,7 +115,7 @@ On the teacher home screen, **Download** saves a question set as a small `.polle
 
 ## Updating the bundled libraries
 
-`vendor/` holds `@supabase/supabase-js` 2.119.0, `pptxgenjs` 4.0.1 and `qrcode-generator` 2.0.4 (all MIT). The fonts are Fredoka and Nunito (SIL Open Font License). Licenses are in `vendor/THIRD-PARTY-LICENSES.txt`. Everything is served from your own site, so school networks that block outside CDNs still work, and visitors' browsers don't contact Google Fonts.
+`vendor/` holds `@supabase/supabase-js` 2.119.0, `pptxgenjs` 4.0.1 and `qrcode-generator` 2.0.4 (all MIT), plus the Firebase JS SDK 13.4.0 compat builds (`firebase-app.js`, `firebase-database.js`, Apache-2.0), which load only when a room uses Firebase. The fonts are Fredoka and Nunito (SIL Open Font License). Licenses are in `vendor/THIRD-PARTY-LICENSES.txt`. Everything is served from your own site, so school networks that block outside CDNs still work, and visitors' browsers don't contact Google Fonts.
 
 ## License
 

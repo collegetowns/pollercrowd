@@ -154,8 +154,8 @@
     var srv = PC.server.current();
     if (srv.mode === "demo") return '<div class="banner warn"><span><b>Demo mode.</b> Students have to be in other tabs of this same browser, so it’s only for trying things out. ' +
       (PC.server.site() ? 'Switch back to the shared server in <button type="button" class="linkbtn" data-act="settings">Settings</button>.' : 'To use real phones, add your Supabase project to <code>js/config.js</code> (see README), or connect your own in <button type="button" class="linkbtn" data-act="settings">Settings</button>.') + "</span></div>";
-    if (srv.own) return '<div class="banner"><span>Using <b>your own Supabase project</b> (' + esc(srv.url.replace(/^https:\/\//, "")) + '). Change this in <button type="button" class="linkbtn" data-act="settings">Settings</button>.</span></div>';
-    return '<div class="banner"><span><b>Heads up:</b> you’re on the shared connection, which handles about <b>200 people at once</b>, counting every class using Poller Crowd at that moment. For big lectures or regular use, <a href="setup.html" target="_blank" rel="noopener">set up your own free Supabase</a> (5 minutes) and add it in <button type="button" class="linkbtn" data-act="settings">Settings</button>.</span></div>';
+    if (srv.own) return '<div class="banner"><span>Using <b>your own ' + (srv.mode === "firebase" ? "Firebase database" : "Supabase project") + "</b> (" + esc(srv.url.replace(/^https:\/\//, "")) + ', up to ' + (srv.mode === "firebase" ? 100 : 200) + ' devices at once). Change this in <button type="button" class="linkbtn" data-act="settings">Settings</button>.</span></div>';
+    return '<div class="banner"><span><b>Heads up:</b> you’re on the shared connection, which handles about <b>' + (srv.mode === "firebase" ? 100 : 200) + ' people at once</b>, counting every class using Poller Crowd at that moment. For big lectures or regular use, <a href="setup.html" target="_blank" rel="noopener">set up your own free Supabase or Firebase</a> (about 5 minutes) and add it in <button type="button" class="linkbtn" data-act="settings">Settings</button>.</span></div>';
   }
 
   /* =========================================================
@@ -405,7 +405,7 @@
     var srv = PC.server.current();
     var s = {
       id: PC.uid(8), deckId: d.id, title: d.title || "Untitled", code: keys.code, fp: keys.fp,
-      keys: { pub: keys.pub, jwk: keys.jwk }, server: srv.mode === "supabase" && srv.own ? { url: srv.url, key: srv.key } : (srv.mode === "demo" ? "demo" : "site"),
+      keys: { pub: keys.pub, jwk: keys.jwk }, server: PC.server.save(srv),
       startedAt: Date.now(), endedAt: null, qi: 0, questions: qs, status: {}, answers: {}, words: {}, qa: {}, roster: {}, kicked: [], locked: false, showJoin: true,
       mode: mode === "self" ? "self" : "teacher"
     };
@@ -419,7 +419,7 @@
     if (!s || s.endedAt) { PC.store.del("live"); go("#"); return; }
     if (live && live.s.id === s.id) { renderLive(); return; }
     if (live) stopLive();
-    var srv = s.server === "demo" ? { mode: "demo" } : s.server === "site" ? (PC.server.site() || { mode: "demo" }) : { mode: "supabase", url: s.server.url, key: s.server.key, own: true };
+    var srv = PC.server.load(s.server);
     live = { s: s, srv: srv, keys: await PC.keys.load(s.keys), devPub: {}, bucket: {}, status: "connecting", hostStatus: "connecting", lastSent: 0, pending: null, seq: Date.now() };
     live.conn = PC.connect(srv);
     live.conn.join(s.code, "teacher", {
@@ -802,11 +802,17 @@
     var m = PC.modal("Settings", '<form class="stack-16" id="setForm" style="gap:22px">' +
       '<fieldset class="stack-16" style="gap:10px"><legend>Live connection</legend>' +
       '<label class="check"><input type="radio" name="srv" value="site"' + (choice === "site" ? " checked" : "") + (site ? "" : " disabled") + "> Poller Crowd’s shared server" + (site ? "" : ' <span class="muted">(not set up on this site yet)</span>') + "</label>" +
-      '<label class="check"><input type="radio" name="srv" value="own"' + (choice === "own" ? " checked" : "") + "> My own free Supabase project <span class=\"muted\">(your own limit of 200 students at once)</span></label>" +
-      '<div class="stack-16" id="ownBox" style="gap:10px;padding-left:30px"><label class="field"><span>Project URL</span><input class="input" name="url" placeholder="https://abcdefgh.supabase.co" value="' + esc(own.url || "") + '" autocomplete="off"></label>' +
+      '<label class="check"><input type="radio" name="srv" value="own"' + (choice === "own" ? " checked" : "") + "> My own free project <span class=\"muted\">(your own limit, nobody else’s classes count)</span></label>" +
+      '<div class="stack-16" id="ownBox" style="gap:12px;padding-left:30px">' +
+      '<div role="radiogroup" aria-label="Which service" style="display:flex;flex-wrap:wrap;gap:8px 22px"><label class="check"><input type="radio" name="prov" value="supabase"' + (own.type !== "firebase" ? " checked" : "") + "> <b>Supabase</b> <span class=\"muted\">up to 200 at once</span></label>" +
+      '<label class="check"><input type="radio" name="prov" value="firebase"' + (own.type === "firebase" ? " checked" : "") + "> <b>Firebase</b> <span class=\"muted\">up to 100 at once</span></label></div>" +
+      '<div class="stack-16" id="sbBox" style="gap:10px"><label class="field"><span>Supabase Project URL</span><input class="input" name="url" placeholder="https://abcdefgh.supabase.co" value="' + esc(own.url || "") + '" autocomplete="off"></label>' +
       '<label class="field"><span>Publishable key (or legacy anon key)</span><input class="input" name="key" placeholder="sb_publishable_…" value="' + esc(own.key || "") + '" autocomplete="off"></label>' +
+      '<p class="note">From your Supabase project: Project Settings → API Keys. These are public keys, safe to use in a web page.</p></div>' +
+      '<div class="stack-16" id="fbBox" style="gap:10px"><label class="field"><span>Firebase Realtime Database URL</span><input class="input" name="fbUrl" placeholder="https://your-project-default-rtdb.firebaseio.com" value="' + esc(own.fbUrl || "") + '" autocomplete="off"></label>' +
+      '<p class="note">From the Firebase console: Databases &amp; Storage → Realtime Database, the link at the top of the Data tab. You also paste a short set of rules once (it’s in the guide).</p></div>' +
       '<div class="controls"><button type="button" class="btn" data-test>Test connection</button><span id="testMsg" role="status"></span></div>' +
-      '<p class="note">Get these from your Supabase project: Project Settings → API Keys. They’re public keys, safe to use in a web page. <a href="setup.html" target="_blank" rel="noopener">5-minute setup guide</a>.</p></div>' +
+      '<p class="note"><a href="setup.html" target="_blank" rel="noopener">Step-by-step setup guide</a>, including how to let an AI assistant walk you through it.</p></div>' +
       '<label class="check"><input type="radio" name="srv" value="demo"' + (choice === "demo" ? " checked" : "") + "> Demo mode <span class=\"muted\">(students in other tabs of this browser, for trying things out)</span></label></fieldset>" +
       '<fieldset class="stack-16" style="gap:6px"><legend>New questions</legend><label class="check"><input type="checkbox" name="hold"' + (st.hold ? " checked" : "") + "> Hold word cloud and Q&amp;A answers for my approval by default</label>" +
       '<label class="check"><input type="checkbox" name="liveResults"' + (st.liveResults ? " checked" : "") + "> Show results on screen as they come in (you can hide them anytime)</label></fieldset>" +
@@ -814,11 +820,18 @@
       '<fieldset class="stack-16" style="gap:8px"><legend>Your data</legend><p class="note">Question sets and results are saved only in this browser. Past sessions are deleted after ' + (+(PC.cfg.keepSessionsDays || 30)) + ' days. Download sets to back them up or share them.</p><div class="controls"><button type="button" class="btn small danger" data-wipe>Delete all past sessions</button></div></fieldset>' +
       '<div class="modal-actions"><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn primary">Save</button></div></form>', { wide: true });
     var f = m.el.querySelector("#setForm");
-    function syncOwn() { m.el.querySelector("#ownBox").style.opacity = f.elements.srv.value === "own" ? 1 : .5; }
+    function syncOwn() {
+      m.el.querySelector("#ownBox").style.opacity = f.elements.srv.value === "own" ? 1 : .5;
+      var fb = f.elements.prov.value === "firebase";
+      m.el.querySelector("#sbBox").hidden = fb; m.el.querySelector("#fbBox").hidden = !fb;
+    }
+    function ownFromForm() {
+      return f.elements.prov.value === "firebase" ? { mode: "firebase", url: PC.cleanFbUrl(f.elements.fbUrl.value) } : { mode: "supabase", url: f.elements.url.value.trim().replace(/\/+$/, ""), key: f.elements.key.value.trim() };
+    }
     f.addEventListener("change", syncOwn); syncOwn();
     m.el.querySelector("[data-test]").addEventListener("click", async function () {
       var msg = m.el.querySelector("#testMsg"); msg.innerHTML = '<span class="chip"><span class="dot wait"></span>Testing…</span>';
-      var r = await PC.testServer({ url: f.elements.url.value.trim().replace(/\/+$/, ""), key: f.elements.key.value.trim() });
+      var r = await PC.testServer(ownFromForm());
       msg.innerHTML = r.ok ? '<span class="chip"><span class="dot"></span>Connected! You’re all set.</span>' : '<span class="warm" style="font-weight:700">' + esc(r.why) + "</span>";
     });
     m.el.querySelector("[data-wipe]").addEventListener("click", async function () {
@@ -829,8 +842,10 @@
     f.addEventListener("submit", function (e) {
       e.preventDefault();
       var url = f.elements.url.value.trim().replace(/\/+$/, ""), key = f.elements.key.value.trim(), srv = f.elements.srv.value;
-      if (srv === "own" && (!/^https:\/\/.+/.test(url) || key.length < 20)) { PC.toast("Add your Project URL (https://…) and key, or pick another option."); return; }
-      PC.store.set("ownServer", url || key ? { url: url, key: key } : null);
+      var prov = f.elements.prov.value, fbUrl = PC.cleanFbUrl(f.elements.fbUrl.value);
+      if (srv === "own" && prov === "supabase" && (!/^https:\/\/.+/.test(url) || key.length < 20)) { PC.toast("Add your Supabase Project URL (https://…) and key, or pick another option."); return; }
+      if (srv === "own" && prov === "firebase" && !PC.fbUrlOk(fbUrl)) { PC.toast("Add your Firebase Realtime Database URL (https://…firebaseio.com or …firebasedatabase.app)."); return; }
+      PC.store.set("ownServer", url || key || fbUrl ? { type: prov, url: url, key: key, fbUrl: fbUrl } : null);
       PC.store.set("serverChoice", srv);
       Store.saveSettings({ hold: f.elements.hold.checked, liveResults: f.elements.liveResults.checked, banned: f.elements.banned.value.split(/[\n,]+/).map(function (x) { return x.trim(); }).filter(Boolean) });
       m.close(); PC.toast(live ? "Saved. The open room keeps its current connection." : "Settings saved.");

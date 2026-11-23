@@ -13,6 +13,12 @@ window.POLLER_CROWD_CONFIG = {
   supabaseUrl: "https://ljguezxzfojzekyfcbdh.supabase.co",
   supabaseKey: "sb_publishable_Kf6e1VZuBhlMUrys0WdveA_DMEK8SM5",
 
+  /* Or use Firebase instead (free plan: 100 devices at once). Paste your
+     Realtime Database URL, e.g. https://my-project-default-rtdb.firebaseio.com,
+     and leave the two Supabase lines above empty. See setup.html for the
+     database rules to paste into Firebase. */
+  firebaseUrl: "",
+
   /* GoatCounter visitor counts. Put just your site code, e.g. "collegetowns"
      for https://collegetowns.goatcounter.com. Leave empty to turn counting off.
      Room codes are never sent; only the page name (like /join.html) is counted. */

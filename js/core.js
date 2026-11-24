@@ -448,7 +448,7 @@
       '<label class="check"><input type="radio" name="kind" value="Idea"> An idea or feature</label>' +
       '<label class="check"><input type="radio" name="kind" value="Wording"> Wording or content</label>' +
       '<label class="check"><input type="radio" name="kind" value="Other"> Something else</label></div></fieldset>' +
-      '<label class="field"><span>Where?</span><select class="input" name="where"><option>Teacher screen</option><option>Student phone</option><option>Buddies</option><option>Exports (CSV, summary, PowerPoint)</option><option>Setup or Supabase</option><option>Other</option></select></label>' +
+      '<label class="field"><span>Where?</span><select class="input" name="where"><option>Presenter’s screen</option><option>Phone (joining)</option><option>Buddies</option><option>Exports (CSV, summary, PowerPoint)</option><option>Setup or Supabase</option><option>Other</option></select></label>' +
       '<label class="field"><span>What happened, or what would you like?*</span><textarea class="input" name="what" rows="4" required placeholder="What you did, what you expected, what happened instead"></textarea></label>' +
       '<div class="grid2"><label class="field"><span>Your name (optional)</span><input class="input" name="name" autocomplete="name"></label>' +
       '<label class="field"><span>Your email (optional, for a reply)</span><input class="input" name="email" type="email" autocomplete="email"></label></div>' +

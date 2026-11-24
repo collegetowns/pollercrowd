@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy · Poller Crowd</title>
-<meta name="description" content="What Poller Crowd stores and where data goes: no student accounts, names or emails. Includes a summary for schools and why it isn't for grading.">
+<meta name="description" content="What Poller Crowd stores and where data goes: no accounts, names or emails for participants. Includes a summary for schools and organizations and why it isn't for grading.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/pollercrowd.css">
 <script src="js/config.js"></script>
@@ -17,25 +17,25 @@
 <main class="doc">
 <span class="label">Privacy</span>
 <h1>What Poller Crowd keeps, and where things go</h1>
-<p style="font-size:19px">Poller Crowd is built to collect as little as possible. Students don’t make accounts or give names, answers aren’t saved on any server, and results stay on the teacher’s own computer. This page explains exactly what happens, in plain language.</p>
-<nav class="toc" aria-label="On this page"><a class="btn small" href="#students">Students</a><a class="btn small" href="#teachers">Teachers</a><a class="btn small" href="#where">Where data goes</a><a class="btn small" href="#grading">Not for grading</a><a class="btn small" href="#schools">For schools</a></nav>
+<p style="font-size:19px">Poller Crowd is built to collect as little as possible. People joining don’t make accounts or give names, answers aren’t saved on any server, and results stay on the presenter’s own computer. This page explains exactly what happens, in plain language.</p>
+<nav class="toc" aria-label="On this page"><a class="btn small" href="#students">People who join</a><a class="btn small" href="#teachers">Teachers &amp; presenters</a><a class="btn small" href="#where">Where data goes</a><a class="btn small" href="#grading">Not for grading</a><a class="btn small" href="#schools">For organizations</a></nav>
 
-<h2 id="students">Students</h2>
+<h2 id="students">People who join (students, audience members)</h2>
 <ul>
-<li><b>No accounts, names or emails.</b> Students join with a QR code or room code and pick a cartoon buddy. A nickname is optional and only shows on quiz leaderboards; the app asks for a fun name, not a real one.</li>
-<li><b>Answers are anonymous.</b> The teacher sees buddies, not people.</li>
-<li><b>Please don’t type personal information.</b> Phones remind students not to put names or personal details in word cloud or Q&amp;A answers. The filter replaces rude words with symbols like #!*&amp;, but it can’t spot personal details, so teachers can also hold typed answers for approval, hide anything, and remove a student from the room.</li>
-<li><b>Nothing is saved on a server.</b> Answers travel from the phone to the teacher’s screen through a live connection and aren’t kept there (details <a href="#where">below</a>).</li>
-<li><b>What the phone keeps:</b> a random ID, the chosen buddy and nickname, and the student’s own answers, so reloading the page doesn’t lose them. These stay in the phone’s browser and are deleted after a week.</li>
+<li><b>No accounts, names or emails.</b> People join with a QR code or room code and pick a cartoon buddy. A nickname is optional and only shows on quiz leaderboards; the app asks for a fun name, not a real one.</li>
+<li><b>Answers are anonymous.</b> The presenter sees buddies, not people.</li>
+<li><b>Please don’t type personal information.</b> Phones remind people not to put names or personal details in word cloud or Q&amp;A answers. The filter replaces rude words with symbols like #!*&amp;, but it can’t spot personal details, so presenters can also hold typed answers for approval, hide anything, and remove someone from the room.</li>
+<li><b>Nothing is saved on a server.</b> Answers travel from the phone to the presenter’s screen through a live connection and aren’t kept there (details <a href="#where">below</a>).</li>
+<li><b>What the phone keeps:</b> a random ID, the chosen buddy and nickname, and the person’s own answers, so reloading the page doesn’t lose them. These stay in the phone’s browser and are deleted after a week.</li>
 </ul>
 
-<h2 id="teachers">Teachers</h2>
+<h2 id="teachers">Teachers and presenters</h2>
 <ul>
-<li><b>Question sets and results are saved only in the teacher’s browser</b>, on that computer. They leave it only if the teacher downloads an export (spreadsheet, summary or PowerPoint) or a question set file.</li>
-<li><b>What a session’s results contain:</b> each answer, linked to a buddy and an optional nickname. The teacher’s screen sees a scrambled (one-way hashed) version of each phone’s random ID, never the ID itself.</li>
-<li><b>Past sessions are deleted automatically after 30 days.</b> Teachers can delete them sooner from the home screen or Settings.</li>
-<li><b>Photos added to questions</b> stay in the teacher’s browser and are only shown on the big screen.</li>
-<li><b>Exports are the teacher’s to look after.</b> Once downloaded, treat them like any other class file.</li>
+<li><b>Question sets and results are saved only in the presenter’s browser</b>, on that computer. They leave it only if the presenter downloads an export (spreadsheet, summary or PowerPoint) or a question set file.</li>
+<li><b>What a session’s results contain:</b> each answer, linked to a buddy and an optional nickname. The presenter’s screen sees a scrambled (one-way hashed) version of each phone’s random ID, never the ID itself.</li>
+<li><b>Past sessions are deleted automatically after 30 days.</b> Presenters can delete them sooner from the home screen or Settings.</li>
+<li><b>Photos added to questions</b> stay in the presenter’s browser and are only shown on the big screen.</li>
+<li><b>Exports are the presenter’s to look after.</b> Once downloaded, treat them like any other work file.</li>
 </ul>
 
 <h2 id="where">Where data goes</h2>
@@ -43,43 +43,50 @@
 <thead><tr><th>Service</th><th>What it’s for</th><th>What it sees</th><th>Kept?</th></tr></thead>
 <tbody>
 <tr><td><b>Website host</b> (GitHub Pages for pollercrowd.collegetowns.org)</td><td>Sends the app’s pages to browsers</td><td>Standard web requests, including IP address and browser type</td><td>The host’s own short-term logs. No answers are sent here.</td></tr>
-<tr><td><b>Live connection</b>: Supabase Realtime, or Firebase Realtime Database (Google) if the teacher chose it</td><td>Passes answers from phones to the teacher’s screen, and the screen’s updates back to phones</td><td>The room’s messages as they pass through (buddies, nicknames, answers), plus IP addresses for the connection</td><td>Supabase: messages aren’t stored. Firebase: kept only while the room is open, then deleted when the session ends. Both services keep their own short-term technical logs.</td></tr>
+<tr><td><b>Live connection</b>: Supabase Realtime, or Firebase Realtime Database (Google) if the presenter chose it</td><td>Passes answers from phones to the presenter’s screen, and the screen’s updates back to phones</td><td>The room’s messages as they pass through (buddies, nicknames, answers), plus IP addresses for the connection</td><td>Supabase: messages aren’t stored. Firebase: kept only while the room is open, then deleted when the session ends. Both services keep their own short-term technical logs.</td></tr>
 <tr><td><b>GoatCounter</b> visitor counts</td><td>Counting page visits, if turned on</td><td>The page name (like “join.html”), browser type and screen size. Never room codes, answers or anything typed.</td><td>Counts only. No cookies, and it doesn’t track people across sites.</td></tr>
 <tr><td><b>Fonts and code libraries</b></td><td>Showing the page</td><td>Nothing: they’re served from this site, so browsers don’t contact Google Fonts or other outside services</td><td>n/a</td></tr>
 <tr><td><b>Feedback form</b></td><td>Reporting bugs or ideas</td><td>Only what the person types, sent from their own email</td><td>In the College Towns inbox</td></tr>
 </tbody>
 </table>
-<p class="note">Anyone with a room’s code or link can join it, and the room’s live updates (mostly what’s on the big screen) aren’t encrypted beyond the normal https connection. Updates from the teacher are digitally signed, so phones ignore fakes. Don’t put anything private in a question.</p>
-<p class="note">Teachers or schools who <a href="setup.html">use their own Supabase or Firebase project</a>, or host their own copy, control that connection themselves.</p>
+<p class="note">Anyone with a room’s code or link can join it, and the room’s live updates (mostly what’s on the big screen) aren’t encrypted beyond the normal https connection. Updates from the presenter are digitally signed, so phones ignore fakes. Don’t put anything private in a question.</p>
+<p class="note">The shared connection runs on College Towns’ own Supabase project. People or organizations who <a href="setup.html">use their own Supabase or Firebase project</a>, or host their own copy, control that connection themselves, including which part of the world it runs in.</p>
 
 <h2 id="grading">Not for grading</h2>
-<p>Poller Crowd is for checking understanding, sparking discussion and making class more fun. It isn’t a test or gradebook tool, and results shouldn’t be used for grades:</p>
+<p>Poller Crowd is for checking understanding, sparking discussion and making a class or talk more fun. It isn’t a test or gradebook tool, and results shouldn’t be used for grades:</p>
 <ul>
-<li><b>Nothing confirms who answered.</b> Anyone with the code can join, students can share a phone or join twice, and nicknames are made up.</li>
+<li><b>Nothing confirms who answered.</b> Anyone with the code can join, people can share a phone or join twice, and nicknames are made up.</li>
 <li><b>Answers can go missing.</b> A weak connection, a phone going to sleep or a reloaded page can drop an answer, and there’s no record to appeal to.</li>
 <li><b>Quiz race timing depends on the connection.</b> Points for speed reward a fast network as much as a fast thinker. That’s fine for a game, not for a grade.</li>
 <li><b>Records aren’t kept.</b> Results live in one browser and are deleted after 30 days.</li>
-<li><b>It keeps privacy simple.</b> Because answers aren’t tied to identified students, Poller Crowd stays out of the student-records business. Using it for grades would change that.</li>
+<li><b>It keeps privacy simple.</b> Because answers aren’t tied to identified people, Poller Crowd stays out of the records business. Using it for grades would change that.</li>
 </ul>
-<p>For graded quizzes, use your school’s learning platform (Canvas, Google Classroom, Moodle and so on).</p>
+<p>For graded quizzes, use your school’s or university’s learning platform (such as Canvas, Moodle, Google Classroom or Blackboard).</p>
 
-<h2 id="schools">For schools and IT reviewers</h2>
-<p>A one-screen summary for district and campus reviews.</p>
+<h2 id="schools">For schools, universities and organizations</h2>
+<p>A one-screen summary for IT, privacy or data-protection reviews.</p>
 <table class="cmp">
 <tbody>
-<tr><th>What it is</th><td>A free, open-source (MIT) web app for live classroom polls, word clouds, quizzes and Q&amp;A. No app to install, no ads, nothing to buy. Source code: <a href="https://github.com/collegetowns/pollercrowd" target="_blank" rel="noopener">github.com/collegetowns/pollercrowd</a>.</td></tr>
-<tr><th>Student accounts</th><td>None. No names, emails, birthdays, logins or school IDs are requested.</td></tr>
-<tr><th>Data collected from students</th><td>The answers they choose to give, a chosen cartoon buddy, an optional made-up nickname, and a random ID kept on their phone (only a one-way hash of it reaches the teacher). Connection services see IP addresses as part of normal internet traffic.</td></tr>
-<tr><th>Where it’s stored</th><td>In the teacher’s browser (results, up to 30 days) and the student’s browser (their own answers, up to 7 days). No Poller Crowd database. Firebase rooms, if used, are deleted when the session ends.</td></tr>
+<tr><th>What it is</th><td>A free, open-source (MIT) web app for live polls, word clouds, quizzes and Q&amp;A in classes, lectures, workshops and presentations. No app to install, no ads, nothing to buy. Source code: <a href="https://github.com/collegetowns/pollercrowd" target="_blank" rel="noopener">github.com/collegetowns/pollercrowd</a>.</td></tr>
+<tr><th>Participant accounts</th><td>None. No names, emails, birthdays, logins or student or staff IDs are requested.</td></tr>
+<tr><th>Data collected from participants</th><td>The answers they choose to give, a chosen cartoon buddy, an optional made-up nickname, and a random ID kept on their phone (only a one-way hash of it reaches the presenter). Connection services see IP addresses as part of normal internet traffic.</td></tr>
+<tr><th>Where it’s stored</th><td>In the presenter’s browser (results, up to 30 days) and each participant’s browser (their own answers, up to 7 days). No Poller Crowd database. Firebase rooms, if used, are deleted when the session ends.</td></tr>
 <tr><th>Sharing or selling</th><td>None. No advertising, profiling or tracking across sites.</td></tr>
 <tr><th>Outside services</th><td>Website host (GitHub Pages), one live-connection service (Supabase or Firebase), optional GoatCounter visit counts. See <a href="#where">Where data goes</a>.</td></tr>
-<tr><th>Security</th><td>https only. Each room’s updates are signed with a per-room key, so phones reject forged messages. Rude-word filter, approval queue and the ability to remove a student.</td></tr>
+<tr><th>Security</th><td>https only. Each room’s updates are signed with a per-room key, so phones reject forged messages. Rude-word filter, approval queue and the ability to remove someone.</td></tr>
 <tr><th>Intended use</th><td>Formative and engagement activities. <a href="#grading">Not for grading</a> or official records.</td></tr>
-<tr><th>Control options</th><td>A school can use its own free Supabase or Firebase project, or host its own copy, so that connection data stays under the school’s own accounts. See the <a href="setup.html">setup guide</a>.</td></tr>
+<tr><th>Control options</th><td>An organization can use its own free Supabase or Firebase project, in the region it chooses, or host its own copy, so that connection data stays under its own accounts. See the <a href="setup.html">setup guide</a>.</td></tr>
 </tbody>
 </table>
-<h3>FERPA and COPPA</h3>
-<p>Poller Crowd is designed to avoid creating student records. Answers are anonymous, aren’t kept on a server, and aren’t meant for grading. Under FERPA, education records are records directly related to a student and kept by the school. Anonymous, short-lived class poll results generally don’t fit that, but that can change if a teacher links answers to named students or keeps them as records. For students under 13, schools usually decide whether a classroom tool may be used under their own COPPA process. We’re not lawyers, and nothing here is legal advice. <b>Please follow your school’s or district’s approval process</b> before using Poller Crowd with students.</p>
+<h3>Privacy laws</h3>
+<p>Poller Crowd is designed to collect as little as possible: answers are anonymous, aren’t kept on a server, and aren’t meant for grading or official records. Which laws apply depends on where you are and who’s in the room. Examples include data-protection laws such as the GDPR in the EU and UK, and student-privacy laws such as FERPA and COPPA in the United States. Some points that come up in reviews:</p>
+<ul>
+<li><b>IP addresses</b> are seen by the website host and the live-connection service as part of normal internet traffic. Some laws, including the GDPR, treat them as personal data.</li>
+<li><b>Data location:</b> to keep connection data in a particular region, use your own Supabase or Firebase project set to that region (see the <a href="setup.html">setup guide</a>).</li>
+<li><b>Student records:</b> anonymous, short-lived poll results generally aren’t records about an identified student. That can change if a presenter links answers to named people or keeps them as records.</li>
+<li><b>Children:</b> for participants under 13 (or your country’s age of digital consent), schools usually decide whether a tool may be used, under their own policies.</li>
+</ul>
+<p>We’re not lawyers, and nothing here is legal advice. <b>Please follow your school’s, university’s or organization’s approval process</b> before using Poller Crowd with students or other participants.</p>
 <h3>Questions</h3>
 <p>Use the feedback form in the footer and we’ll get back to you. We don’t sign individual data agreements, but we’re happy to answer questions for your review.</p>
 </main>

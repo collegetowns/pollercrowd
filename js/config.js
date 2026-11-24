@@ -9,7 +9,7 @@ window.POLLER_CROWD_CONFIG = {
      or the legacy "anon public" key. Both are safe to put in a public website.
      Leave both empty to run in demo mode only (teacher and students in the
      same browser, for trying things out). Teachers can always connect their
-     own Supabase project under Settings on the teacher screen. */
+     own Supabase project under Settings on the presenter screen. */
   supabaseUrl: "https://ljguezxzfojzekyfcbdh.supabase.co",
   supabaseKey: "sb_publishable_Kf6e1VZuBhlMUrys0WdveA_DMEK8SM5",
 

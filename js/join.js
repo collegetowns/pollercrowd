@@ -1,4 +1,4 @@
-/* Poller Crowd — student phone app. */
+/* Poller Crowd — phone app for people joining a room. */
 (function () {
   "use strict";
   var PC = window.PC, B = window.PCBuddies, F = window.PCFilter, $ = PC.$, esc = PC.esc;
@@ -29,7 +29,7 @@
     try { await conn.toHost(msg); return true; }
     catch (e) {
       if (tries < 3) { await new Promise(function (r) { setTimeout(r, 800 * (tries + 1)); }); return send(msg, tries + 1); }
-      PC.toast("Couldn’t reach the teacher’s screen. Check your Wi-Fi and try again.", 4000);
+      PC.toast("Couldn’t reach the presenter’s screen. Check your Wi-Fi and try again.", 4000);
       return false;
     }
   }
@@ -104,11 +104,11 @@
     var h;
     if (screen === "code") h = codeScreen();
     else if (screen === "error") h = header() + '<div class="wait-card"><h1>Couldn’t load</h1><p class="muted">Part of the page didn’t load. Check your connection and reload.</p></div>';
-    else if (state && state.kicked && state.kicked.indexOf(me) >= 0) h = header() + waitCard("You’ve left this room", "The teacher removed this phone from the room.", false);
+    else if (state && state.kicked && state.kicked.indexOf(me) >= 0) h = header() + waitCard("You’ve left this room", "The presenter removed this phone from the room.", false);
     else if (state && state.ended) h = header() + waitCard("Thanks for coming in from the cold!", "This session has ended. You can close this page.", true);
     else if (screen === "pick") h = pickScreen();
-    else if (!state) h = header() + waitCard("Finding the igloo…", status === "SUBSCRIBED" ? "Waiting for the teacher’s screen. Make sure the room is open on the projector." : "Connecting to the room…", true) + (Date.now() - gotAt > 8000 ? '<p class="note" style="text-align:center">Still waiting? Double-check the room code, or scan the QR code again.</p>' : "");
-    else if (state.locked && !state.roster[me]) h = header() + waitCard("This room is locked", "The teacher has closed the doors for now. Ask them to unlock it.", false);
+    else if (!state) h = header() + waitCard("Finding the igloo…", status === "SUBSCRIBED" ? "Waiting for the presenter’s screen. Make sure the room is open on the projector." : "Connecting to the room…", true) + (Date.now() - gotAt > 8000 ? '<p class="note" style="text-align:center">Still waiting? Double-check the room code, or scan the QR code again.</p>' : "");
+    else if (state.locked && !state.roster[me]) h = header() + waitCard("This room is locked", "The presenter has closed the doors for now. Ask them to unlock it.", false);
     else if (state.podium) h = header() + podiumScreen();
     else if (state.self) h = header() + raceScreen();
     else h = header() + questionScreen();
@@ -179,7 +179,7 @@
       var draft = q.multi ? (drafts["m" + q.id] || picked) : picked;
       var locked = q.type === "qz" && mine != null;
       if ((q.type === "qz" || q.timer) && !q.started) {
-        h += '<div class="wait-card"><h2>Get ready…</h2><p class="muted">' + (q.type === "qz" ? "The race starts when your teacher presses Start. Faster correct answers score more!" : "You’ll have " + q.timer + " seconds once your teacher presses Start.") + "</p></div>";
+        h += '<div class="wait-card"><h2>Get ready…</h2><p class="muted">' + (q.type === "qz" ? "The race starts when the presenter presses Start. Faster correct answers score more!" : "You’ll have " + q.timer + " seconds once the presenter presses Start.") + "</p></div>";
         return h;
       }
       h += '<div class="stack-16" style="gap:10px" role="' + (q.multi ? "group" : "radiogroup") + '" aria-label="Answers">' + q.options.map(function (o, i) {
@@ -226,7 +226,7 @@
       if (q.open && asked < 3) h += '<form id="askForm" class="stack-16" style="gap:8px"><label class="field"><span>Ask a question (anonymous)</span><textarea id="askIn" class="input" rows="2" maxlength="160" placeholder="What’s still foggy?">' + esc(drafts.a || "") + '</textarea></label><span class="note">Don’t include your name or anything personal about you or anyone else.</span><button class="btn primary block" type="submit">Send question</button></form>';
       else if (q.open) h += '<div class="sent">You’ve asked 3 questions. Upvote the ones you want answered!</div>';
       var list = q.qa || [];
-      h += '<div class="stack-16" style="gap:8px"><span class="label">Class questions · ' + list.length + "</span>" + (list.length ? list.map(function (x) {
+      h += '<div class="stack-16" style="gap:8px"><span class="label">Questions from the room · ' + list.length + "</span>" + (list.length ? list.map(function (x) {
         var on = !!ups[x.id];
         return '<div class="qa-item' + (x.a ? " answered" : "") + '"><span class="qa-text" style="font-size:17px">' + esc(x.text) + (x.a ? ' <small class="muted">(answered)</small>' : "") + '</span><button type="button" class="btn small' + (on ? " primary" : "") + '" data-up-q="' + x.id + '" aria-pressed="' + on + '" aria-label="Upvote"' + (closed ? " disabled" : "") + ">▲ " + x.n + "</button></div>";
       }).join("") : '<p class="muted">No questions yet. Be the first!</p>') + "</div>" +
@@ -283,7 +283,7 @@
   function raceScreen() {
     var S = state.self, rd = raceData(), mine = myResults(), tot = S.tot && S.tot[me];
     var score = '<div class="race-score"><span>Score</span><b>' + (tot ? tot[0] : 0) + "</b>" + (tot ? "<span>place " + tot[1] + " of " + S.players + "</span>" : "") + "</div>";
-    if (S.state === "lobby") return '<div class="wait-card"><h1 style="font-size:30px">Get ready to race!</h1><p class="muted">When your teacher presses Start, you’ll race through ' + "the questions on your own. Faster right answers score more!</p></div>";
+    if (S.state === "lobby") return '<div class="wait-card"><h1 style="font-size:30px">Get ready to race!</h1><p class="muted">When the presenter presses Start, you’ll race through ' + "the questions on your own. Faster right answers score more!</p></div>";
     if (S.state === "done") return score + '<div class="wait-card"><h1 style="font-size:28px">Race over!</h1><p class="muted">Watch the big screen for the podium.</p></div>' + resultList(S, mine);
     var i = rd.i;
     if (i >= S.qs.length) return score + '<div class="wait-card"><h1 style="font-size:28px">You finished!</h1><p class="muted">Nice racing. Wait for everyone else, then watch the big screen.</p></div>' + resultList(S, mine);
@@ -412,7 +412,7 @@
       var t = ($("#askIn").value || "").replace(/\s+/g, " ").trim();
       if (t.length < 3) { PC.toast("Type your question first."); return; }
       room.asked[q.id] = (room.asked[q.id] || 0) + 1; saveRoom();
-      drafts.a = ""; render(); PC.toast(q.moderate ? "Sent! It shows up once your teacher approves it." : "Question sent!");
+      drafts.a = ""; render(); PC.toast(q.moderate ? "Sent! It shows up once the presenter approves it." : "Question sent!");
       send({ t: "ask", q: q.id, text: t });
     }
   });

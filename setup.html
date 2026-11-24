@@ -27,7 +27,7 @@
 <main class="doc">
 <span class="label">Setup guide</span>
 <h1>Get your own Poller Crowd connection</h1>
-<p style="font-size:19px">Poller Crowd works right away on the shared connection, which handles about 200 people at once across <i>every</i> class using it. If you teach big classes or use it often, give it a free connection of your own so nobody else’s classes count against you. There’s nothing to pay and no code to write. Pick whichever path suits you:</p>
+<p style="font-size:19px">Poller Crowd works right away on the shared connection, which handles about 200 people at once across <i>every</i> session using it, worldwide. If you teach big classes, speak to large audiences or use it often, give it a free connection of your own so nobody else’s sessions count against you. There’s nothing to pay and no code to write. Pick whichever path suits you:</p>
 
 <div class="paths">
   <a class="path" href="#ai"><span class="label">Easiest</span><b>Let your AI assistant walk you through it</b><span class="muted">Copy one message into Claude, ChatGPT, Gemini or Copilot. It guides you click by click.</span></a>
@@ -47,7 +47,7 @@
 </ul>
 
 <h2 id="own">Path 2. Use your own free project on this site</h2>
-<p>You make a free project on one of two services, then paste its details into the gear icon (Settings) on the <a href="host.html">teacher screen</a>. Both are free with no credit card. Pick one:</p>
+<p>You make a free project on one of two services, then paste its details into the gear icon (Settings) on the <a href="host.html">presenter screen</a>. Both are free with no credit card. Pick one:</p>
 <table class="cmp">
 <thead><tr><th></th><th>Supabase</th><th>Firebase (by Google)</th></tr></thead>
 <tbody>
@@ -55,17 +55,17 @@
 <tr><th>Sign up with</th><td>GitHub or email</td><td>A Google account</td></tr>
 <tr><th>What you paste into Settings</th><td>Project URL + publishable key</td><td>Database URL (plus rules, pasted once into Firebase)</td></tr>
 <tr><th>Falls asleep?</th><td>Yes, after about a week without use. One click wakes it.</td><td>No</td></tr>
-<tr><th>Other free limits</th><td>2 active projects per account</td><td>10 GB of downloads a month, plenty for regular classes</td></tr>
+<tr><th>Other free limits</th><td>2 active projects per account</td><td>10 GB of downloads a month, plenty for regular use</td></tr>
 </tbody>
 </table>
-<p class="note">Not sure? Choose <b>Supabase</b> for lectures over 100, and <b>Firebase</b> if you already use Google and want something that never sleeps.</p>
+<p class="note">Not sure? Choose <b>Supabase</b> for audiences over 100, and <b>Firebase</b> if you already use Google and want something that never sleeps.</p>
 
 <h3 id="supabase">Supabase, step by step</h3>
 <ol>
 <li>Go to <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> and sign up (GitHub or email).</li>
 <li>Click <b>New project</b>. Name it something like <code>poller-crowd</code>, set any database password (you won’t need it again) and pick the region closest to you. Wait a minute or two while it sets up.</li>
 <li>Open <b>Project Settings → API Keys</b> (or click <b>Connect</b> at the top). Copy the <b>Project URL</b>, which looks like <code>https://abcdefgh.supabase.co</code>, and the <b>Publishable key</b>, which starts with <code>sb_publishable_</code>. Older projects call it the <b>anon public</b> key; either works.</li>
-<li>On the <a href="host.html">teacher screen</a>, click the gear icon. Choose <b>My own free project</b>, then <b>Supabase</b>. Paste the two values, press <b>Test connection</b>, and when it says <b>Connected</b>, press <b>Save</b>.</li>
+<li>On the <a href="host.html">presenter screen</a>, click the gear icon. Choose <b>My own free project</b>, then <b>Supabase</b>. Paste the two values, press <b>Test connection</b>, and when it says <b>Connected</b>, press <b>Save</b>.</li>
 </ol>
 <p class="note">Nothing to build inside Supabase: Poller Crowd only sends live messages, so there are no tables. Leave <b>Realtime → Settings → Allow public access</b> on (it is by default). These are public keys made for web pages; never paste the <b>secret</b> or <b>service_role</b> key anywhere.</p>
 
@@ -78,25 +78,26 @@
 <pre class="copybox" id="fbRules" style="margin-top:10px"></pre>
 <div class="copyrow" style="margin-top:8px"><button type="button" class="btn" data-copy="fbRules">Copy the rules</button></div></li>
 <li>Open the <b>Data</b> tab and copy the link at the top. It looks like <code>https://poller-crowd-default-rtdb.firebaseio.com</code> or <code>https://poller-crowd-default-rtdb.europe-west1.firebasedatabase.app</code>.</li>
-<li>On the <a href="host.html">teacher screen</a>, click the gear icon. Choose <b>My own free project</b>, then <b>Firebase</b>. Paste the link, press <b>Test connection</b>, and when it says <b>Connected</b>, press <b>Save</b>.</li>
+<li>On the <a href="host.html">presenter screen</a>, click the gear icon. Choose <b>My own free project</b>, then <b>Firebase</b>. Paste the link, press <b>Test connection</b>, and when it says <b>Connected</b>, press <b>Save</b>.</li>
 </ol>
 <p class="note">Firebase may email you that your rules allow public access. That’s expected: phones join without accounts, so rooms have to be open, but only inside the <code>pc</code> area and only in the shapes Poller Crowd uses. Nothing is kept: each room is deleted when you end the session.</p>
 
 <h3>Good to know, either way</h3>
 <ul>
-<li><b>Before class, press Test connection</b> in Settings. If a Supabase project fell asleep, open the Supabase dashboard, pick the project and press <b>Restore</b>.</li>
+<li><b>Before you present, press Test connection</b> in Settings. If a Supabase project fell asleep, open the Supabase dashboard, pick the project and press <b>Restore</b>.</li>
 <li>Students joining your rooms need the <b>QR code or link</b>, which tells their phones where your project is. The room code alone points to the shared connection.</li>
 <li>Your setting is saved in your browser on that computer. On a different computer, paste the same values into Settings again.</li>
 <li>Share your project with colleagues if you like. Just remember everyone using it shares its limit.</li>
+<li><b>Need data to stay in a particular part of the world</b>, such as the EU, the UK or your own country? Pick that region or location when you create the project. Both services offer locations around the world.</li>
 </ul>
 
 <h2 id="host">Path 3. Host your own copy</h2>
-<p>Poller Crowd is free and open source (MIT license). It’s plain HTML, CSS and JavaScript with no build step, so any website host that serves files will do. Hosting your own copy lets you set the connection once for everyone who uses your site, put it on your school’s web address, or change the app.</p>
+<p>Poller Crowd is free and open source (MIT license). It’s plain HTML, CSS and JavaScript with no build step, so any website host that serves files will do. Hosting your own copy lets you set the connection once for everyone who uses your site, put it on your school’s or organization’s web address, or change the app.</p>
 <div class="copyrow"><a class="btn primary" id="zipLink" href="https://github.com/collegetowns/pollercrowd/archive/refs/heads/main.zip">Download the app (.zip)</a><a class="btn" href="https://github.com/collegetowns/pollercrowd" target="_blank" rel="noopener">View it on GitHub</a></div>
 <ol>
 <li>Make your free Supabase or Firebase project (Path 2 above).</li>
 <li>Open <code>js/config.js</code>, the only file you need to edit, and paste your values: <code>supabaseUrl</code> and <code>supabaseKey</code>, <i>or</i> <code>firebaseUrl</code> (leave the Supabase lines empty). Change or clear <code>goatcounterCode</code> and <code>feedbackTo</code> so visit counts and feedback come to you instead of College Towns.</li>
-<li>Publish the folder. The simplest free option: fork the repository on GitHub, then <b>Settings → Pages → Deploy from a branch → main</b>. Netlify, Cloudflare Pages or your school’s web server work too. It must be served over <b>https</b>, because phones need a secure page for live connections.</li>
+<li>Publish the folder. The simplest free option: fork the repository on GitHub, then <b>Settings → Pages → Deploy from a branch → main</b>. Netlify, Cloudflare Pages or your own web server work too. It must be served over <b>https</b>, because phones need a secure page for live connections.</li>
 <li>Open <code>host.html</code> on your site and present the sample set. Scan the QR code with your phone to check it works.</li>
 </ol>
 <p class="note">Want an AI assistant to do this part? Use the message in <a href="#ai">Path 1</a> and pick “host my own copy”. The <a href="README.md">README</a> has more detail for developers.</p>
@@ -110,7 +111,7 @@
   var REPO = "https://github.com/collegetowns/pollercrowd", RAW = "https://raw.githubusercontent.com/collegetowns/pollercrowd/main/AGENTS.md";
   var site = location.protocol === "https:" ? location.origin + location.pathname.replace(/[^/]*$/, "") : "https://pollercrowd.collegetowns.org/";
   PC.$("#aiPrompt").textContent =
-    "I'm a teacher and I'd like your help setting up Poller Crowd, a free classroom polling app (" + site + "), with its own free connection so my classes don't share the public limit.\n\n" +
+    "I'd like your help setting up Poller Crowd, a free live polling app for classes and presentations (" + site + "), with its own free connection so my sessions don't share the public limit.\n\n" +
     "Please read the setup instructions written for AI assistants: " + RAW + "\n" +
     "(If you can't open links, tell me and I'll attach the file or paste it in.)\n\n" +
     "Then ask me which I want:\n" +

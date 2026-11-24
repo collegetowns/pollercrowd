@@ -17,9 +17,9 @@
   /* ---------- CSV ---------- */
   function csvCell(v) { v = v == null ? "" : String(v); return /[",\n\r]/.test(v) || /^[=+\-@]/.test(v) ? '"' + (/^[=+\-@]/.test(v) ? "'" : "") + v.replace(/"/g, '""') + '"' : v; }
   function csv(s) {
-    var rows = [["Poller Crowd results"], ["Session", s.title], ["Date", dateStr(s.startedAt)], ["Room", s.code], ["Students", people(s)],
+    var rows = [["Poller Crowd results"], ["Session", s.title], ["Date", dateStr(s.startedAt)], ["Room", s.code], ["Participants", people(s)],
       ["Note", "Anonymous answers for checking understanding. Not suitable for grading: nothing confirms who answered."], [],
-      ["Question #", "Type", "Question", "Answer / item / word", "Count", "Percent of students", "Notes"]];
+      ["Question #", "Type", "Question", "Answer / item / word", "Count", "Percent of participants", "Notes"]];
     s.questions.forEach(function (q, i) {
       if (q.type === "sl") return;
       var r = R.compute(s, q), T = R.TYPES[q.type].name, n = i + 1;
@@ -46,7 +46,7 @@
     var body = s.questions.map(function (q, i) {
       var v = R.view(s, q, { reveal: true, limit: 50 });
       var im = q.image && PC.images.cached(q.image);
-      return '<section><p class="label">' + (q.type === "sl" ? "Slide " + (i + 1) + " · Info slide" : "Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + v.data.total + (v.data.total === 1 ? " student" : " students")) + "</p><h2>" + e(q.prompt) + "</h2>" +
+      return '<section><p class="label">' + (q.type === "sl" ? "Slide " + (i + 1) + " · Info slide" : "Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + v.data.total + (v.data.total === 1 ? " person" : " people")) + "</p><h2>" + e(q.prompt) + "</h2>" +
         (im ? '<img src="' + im + '" alt="' + e(q.imageAlt || "Photo for this question") + '" style="display:block;max-width:100%;max-height:300px;border-radius:12px;margin:0 0 16px">' : "") + v.html + "</section>";
     }).join("");
     var lb = R.leaderboard(s, 10);
@@ -56,7 +56,7 @@
     var html = '<!doctype html><html lang="en" data-theme="day"><head><meta charset="utf-8"><title>' + e(s.title) + " · Poller Crowd summary</title>" + css +
       "<style>body{background:#fff;color:#0B1F3A;font-size:15px}main{max-width:880px;margin:0 auto;padding:28px 24px}section{break-inside:avoid;page-break-inside:avoid;border-top:2px solid #CFE6F7;padding:22px 0}h1{font-size:34px}h2{font-size:24px;margin:6px 0 16px}" +
       ".label{color:#1E66A6}.cloud{min-height:0}.bar-head{font-size:17px}.bar-num{font-size:20px}.qa-text{font-size:16px}.frozen{min-height:0;padding:18px}.noprint{margin:12px 0 0}@media print{.noprint{display:none}main{padding:0}}</style></head><body><main>" +
-      '<p class="label">Poller Crowd summary</p><h1>' + e(s.title) + '</h1><p class="muted">' + dateStr(s.startedAt) + " · room " + e(s.code) + " · " + people(s) + ' students · answers are anonymous · for checking understanding, not for grading</p><p class="noprint controls"><a class="btn" href="' + PC.siteBase() + 'host.html">← Back to Poller Crowd</a><button class="btn primary" onclick="print()">Print or save as PDF</button></p>' +
+      '<p class="label">Poller Crowd summary</p><h1>' + e(s.title) + '</h1><p class="muted">' + dateStr(s.startedAt) + " · room " + e(s.code) + " · " + people(s) + ' people · answers are anonymous · for checking understanding, not for grading</p><p class="noprint controls"><a class="btn" href="' + PC.siteBase() + 'host.html">← Back to Poller Crowd</a><button class="btn primary" onclick="print()">Print or save as PDF</button></p>' +
       body + '<p class="noprint controls" style="margin-top:20px"><a class="btn primary" href="' + PC.siteBase() + 'host.html">← Back to Poller Crowd</a><button class="btn" onclick="print()">Print or save as PDF</button></p><p class="muted" style="margin-top:20px">Made with Poller Crowd · Powered by College Towns</p></main></body></html>';
     var w = window.open("", "_blank");
     if (w) { w.document.open(); w.document.write(html); w.document.close(); }
@@ -126,7 +126,7 @@
     t.addText("Poller Crowd", { x: 2.6, y: 1.05, w: 8, h: 0.6, fontFace: H, fontSize: 28, bold: true, color: C.ink });
     t.addText("Warm up the lecture", { x: 2.6, y: 1.6, w: 8, h: 0.4, fontFace: BODY, fontSize: 16, bold: true, color: C.warmText });
     t.addText(s.title, { x: 0.8, y: 2.9, w: 11.7, h: 1.4, fontFace: H, fontSize: 44, bold: true, color: C.ink, valign: "top" });
-    t.addText(dateStr(s.startedAt) + "  ·  " + people(s) + " students  ·  " + s.questions.length + " questions", { x: 0.8, y: 4.4, w: 11.7, h: 0.5, fontFace: BODY, fontSize: 18, color: C.muted });
+    t.addText(dateStr(s.startedAt) + "  ·  " + people(s) + " people  ·  " + s.questions.length + " questions", { x: 0.8, y: 4.4, w: 11.7, h: 0.5, fontFace: BODY, fontSize: 18, color: C.muted });
     t.addText("Anonymous answers for checking understanding, not for grading.", { x: 0.8, y: 4.9, w: 11.7, h: 0.4, fontFace: BODY, fontSize: 14, italic: true, color: C.muted });
     var buddies = Object.keys(s.roster || {}).slice(0, 14);
     for (var bi = 0; bi < buddies.length; bi++) {
@@ -135,7 +135,7 @@
     }
     for (var i = 0; i < s.questions.length; i++) {
       var q = s.questions[i], r = R.compute(s, q);
-      var sl = base(q.type === "sl" ? "Slide " + (i + 1) : "Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + r.total + (r.total === 1 ? " student" : " students"));
+      var sl = base(q.type === "sl" ? "Slide " + (i + 1) : "Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + r.total + (r.total === 1 ? " person" : " people"));
       sl.addText(q.prompt, { x: 0.6, y: 0.75, w: 12.1, h: 1.1, fontFace: H, fontSize: 30, bold: true, color: C.ink, valign: "top", fit: "shrink" });
       var area = { x: 0.6, y: 2.0, w: 12.1, h: 4.8 }, photo = q.image && PC.images.cached(q.image);
       if (photo) {
@@ -168,7 +168,7 @@
         sl.addText("1 = " + (q.lowLabel || "") + "    " + r.max + " = " + (q.highLabel || ""), { x: area.x, y: 6.55, w: rw, h: 0.35, fontFace: BODY, fontSize: 12, color: C.muted });
       }
       if (q.type === "th") {
-        sl.addChart(p.ChartType.bar, [{ name: "Students", labels: r.bins.map(function (_, j) { return j % 4 === 0 ? String(j * 5) : ""; }), values: r.bins }],
+        sl.addChart(p.ChartType.bar, [{ name: "People", labels: r.bins.map(function (_, j) { return j % 4 === 0 ? String(j * 5) : ""; }), values: r.bins }],
           { x: area.x, y: 2.7, w: area.w, h: 3.5, barDir: "col", chartColors: r.bins.map(function (_, j) { return mix(C.glacier, C.warm, (j + 0.5) / 20); }), showValue: false, catAxisLabelColor: C.muted, catAxisLabelFontSize: 12, valAxisHidden: true, valGridLine: { style: "none" }, barGapWidthPct: 25, showLegend: false });
         sl.addText("Crowd average " + Math.round(r.avg) + "°  ·  " + R.lean(q, r.avg) + "  ·  middle half " + r.low + "–" + r.high + "°", { x: area.x, y: 2.0, w: area.w, h: 0.6, fontFace: H, fontSize: photo ? 18 : 24, bold: true, color: C.ink, fit: "shrink" });
         sl.addText([{ text: "❄ 0 = " + (q.lowLabel || ""), options: { align: "left" } }], { x: area.x, y: 6.3, w: area.w / 2, h: 0.4, fontFace: BODY, fontSize: 14, bold: true, color: C.muted });

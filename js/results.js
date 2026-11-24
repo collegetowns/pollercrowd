@@ -178,8 +178,8 @@
     if (q.type === "th") {
       var mb = Math.max.apply(null, r.bins.concat([1])), avg = Math.round(r.avg);
       h = '<div class="stat-row"><div class="stat"><span class="label">Crowd average</span><b>' + (r.total ? avg + "°" : "–") + '</b><span class="muted">' + (r.total ? esc(lean(q, r.avg)) : "out of 100°") + "</span></div>" +
-        '<div class="stat"><span class="label">Middle half of the class</span><b>' + (r.total ? r.low + "–" + r.high + "°" : "–") + '</b></div><div class="stat"><span class="label">Responses</span><b>' + r.total + "</b></div></div>" +
-        '<div class="therm" role="img" aria-label="Where students placed it, from ' + esc(q.lowLabel || "") + " to " + esc(q.highLabel || "") + (r.total ? ". Average " + avg + " out of 100" : "") + '"><div class="therm-cols">' + r.bins.map(function (c, i) {
+        '<div class="stat"><span class="label">Middle half of the room</span><b>' + (r.total ? r.low + "–" + r.high + "°" : "–") + '</b></div><div class="stat"><span class="label">Responses</span><b>' + r.total + "</b></div></div>" +
+        '<div class="therm" role="img" aria-label="Where people placed it, from ' + esc(q.lowLabel || "") + " to " + esc(q.highLabel || "") + (r.total ? ". Average " + avg + " out of 100" : "") + '"><div class="therm-cols">' + r.bins.map(function (c, i) {
           return '<div class="tcol"><div class="tbar" style="height:' + Math.round(c / mb * 100) + "%;background:color-mix(in srgb, var(--warm) " + Math.round((i + 0.5) * 5) + '%, var(--glacier))">' + (c ? "<b>" + c + "</b>" : "") + "</div></div>";
         }).join("") + '</div><div class="therm-track">' + (r.total ? '<span class="therm-pin" style="left:' + r.avg.toFixed(1) + '%"><span>' + avg + "°</span></span>" : "") + "</div>" +
         '<div class="therm-ends"><span>❄ ' + esc(q.lowLabel || "") + "</span><span>" + esc(q.highLabel || "") + " 🔥</span></div></div>";
@@ -206,7 +206,7 @@
       }
     }
     if (q.type === "qa") {
-      if (!r.items.length) h = '<div class="frozen"><h3>No questions yet</h3><p class="muted">Students can ask from their phones and upvote each other’s.</p></div>';
+      if (!r.items.length) h = '<div class="frozen"><h3>No questions yet</h3><p class="muted">People can ask from their phones and upvote each other’s.</p></div>';
       else h = '<div class="qa-list">' + r.items.slice(0, opts.limit || 12).map(function (x) {
         return '<div class="qa-item' + (x.answered ? " answered" : "") + '"><span class="qa-votes">' + x.votes + "<small>votes</small></span><span class=\"qa-text\">" + esc(x.text) + "</span>" +
           (opts.controls ? '<span class="controls"><button type="button" class="btn small" data-qa-ans="' + x.id + '">' + (x.answered ? "Unmark" : "Answered") + '</button><button type="button" class="btn small" data-qa-hide="' + x.id + '">Hide</button></span>' : "") + "</div>";

@@ -152,10 +152,10 @@
   function fmtDate(t) { return t ? new Date(t).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : ""; }
   function serverBanner() {
     var srv = PC.server.current();
-    if (srv.mode === "demo") return '<div class="banner warn"><span><b>Demo mode.</b> Students have to be in other tabs of this same browser, so it’s only for trying things out. ' +
+    if (srv.mode === "demo") return '<div class="banner warn"><span><b>Demo mode.</b> People have to be in other tabs of this same browser, so it’s only for trying things out. ' +
       (PC.server.site() ? 'Switch back to the shared server in <button type="button" class="linkbtn" data-act="settings">Settings</button>.' : 'To use real phones, add your Supabase project to <code>js/config.js</code> (see README), or connect your own in <button type="button" class="linkbtn" data-act="settings">Settings</button>.') + "</span></div>";
     if (srv.own) return '<div class="banner"><span>Using <b>your own ' + (srv.mode === "firebase" ? "Firebase database" : "Supabase project") + "</b> (" + esc(srv.url.replace(/^https:\/\//, "")) + ', up to ' + (srv.mode === "firebase" ? 100 : 200) + ' devices at once). Change this in <button type="button" class="linkbtn" data-act="settings">Settings</button>.</span></div>';
-    return '<div class="banner"><span><b>Heads up:</b> you’re on the shared connection, which handles about <b>' + (srv.mode === "firebase" ? 100 : 200) + ' people at once</b>, counting every class using Poller Crowd at that moment. For big lectures or regular use, <a href="setup.html" target="_blank" rel="noopener">set up your own free Supabase or Firebase</a> (about 5 minutes) and add it in <button type="button" class="linkbtn" data-act="settings">Settings</button>.</span></div>';
+    return '<div class="banner"><span><b>Heads up:</b> you’re on the shared connection, which handles about <b>' + (srv.mode === "firebase" ? 100 : 200) + ' people at once</b>, counting every room using Poller Crowd at that moment. For big audiences or regular use, <a href="setup.html" target="_blank" rel="noopener">set up your own free Supabase or Firebase</a> (about 5 minutes) and add it in <button type="button" class="linkbtn" data-act="settings">Settings</button>.</span></div>';
   }
 
   /* =========================================================
@@ -174,7 +174,7 @@
       }).join("") : '<p class="muted">No question sets yet. Make one, or import one a colleague shared.</p>') + "</section>" +
       '<section class="stack-16"><h2 style="font-size:26px">Past sessions</h2>' +
       (sessions.length ? sessions.map(function (x) {
-        return '<div class="deck-row"><div class="t"><b>' + esc(x.title) + '</b><div class="muted">' + fmtDate(x.startedAt) + " · room " + esc(x.code) + " · " + x.people + (x.people === 1 ? " student" : " students") + (x.endedAt ? "" : " · still open") + '</div></div><div class="controls">' +
+        return '<div class="deck-row"><div class="t"><b>' + esc(x.title) + '</b><div class="muted">' + fmtDate(x.startedAt) + " · room " + esc(x.code) + " · " + x.people + (x.people === 1 ? " person" : " people") + (x.endedAt ? "" : " · still open") + '</div></div><div class="controls">' +
           '<button type="button" class="btn" data-act="results" data-id="' + x.id + '">Results &amp; export</button><button type="button" class="btn small danger" data-act="del-session" data-id="' + x.id + '">Delete</button></div></div>';
       }).join("") : '<p class="muted">Results from your sessions will show up here. They stay only on this computer and are deleted after ' + (+(PC.cfg.keepSessionsDays || 30)) + " days.</p>") +
       "</section></main>" + footer();
@@ -246,15 +246,15 @@
         (q.type === "mc" && R.corrects(q).length ? '<button type="button" class="btn small" data-act="no-correct">Clear correct answers</button>' : "") + "</div></fieldset>";
     }
     h += '<div class="grid2">';
-    if (q.type === "mc") h += '<label class="check"><input type="checkbox" data-f="multi"' + (q.multi ? " checked" : "") + "> Students can pick more than one</label>" + '<label class="field"><span>Timer</span>' + sel("timer", TIMERS_MC, q.timer || 0) + "</label>";
+    if (q.type === "mc") h += '<label class="check"><input type="checkbox" data-f="multi"' + (q.multi ? " checked" : "") + "> People can pick more than one</label>" + '<label class="field"><span>Timer</span>' + sel("timer", TIMERS_MC, q.timer || 0) + "</label>";
     if (q.type === "qz") h += '<label class="field"><span>Time to answer</span>' + sel("timer", TIMERS_QZ, q.timer || 20) + '</label><p class="note" style="align-self:end">This is a competition: faster correct answers earn more points (500 to 1,000), points add up across all the quiz race questions in this set, and the session ends with a trophy podium.</p>';
-    if (q.type === "wc") h += '<label class="field"><span>Words per student</span>' + sel("maxWords", [[1, "1 word"], [2, "Up to 2"], [3, "Up to 3"]], q.maxWords) + '</label><label class="check"><input type="checkbox" data-f="moderate"' + (q.moderate ? " checked" : "") + "> Hold words for my approval before they show</label>";
-    if (q.type === "qa") h += '<label class="check"><input type="checkbox" data-f="moderate"' + (q.moderate ? " checked" : "") + '> Hold questions for my approval before they show</label><p class="note">Students can ask up to 3 questions and upvote each other’s.</p>';
+    if (q.type === "wc") h += '<label class="field"><span>Words per person</span>' + sel("maxWords", [[1, "1 word"], [2, "Up to 2"], [3, "Up to 3"]], q.maxWords) + '</label><label class="check"><input type="checkbox" data-f="moderate"' + (q.moderate ? " checked" : "") + "> Hold words for my approval before they show</label>";
+    if (q.type === "qa") h += '<label class="check"><input type="checkbox" data-f="moderate"' + (q.moderate ? " checked" : "") + '> Hold questions for my approval before they show</label><p class="note">People can ask up to 3 questions and upvote each other’s.</p>';
     if (q.type === "rs") h += '<label class="field"><span>Scale</span>' + sel("scaleMax", [[5, "1 to 5"], [10, "1 to 10"]], q.scaleMax) + '</label><span></span><label class="field"><span>Label for 1</span><input class="input" data-f="lowLabel" value="' + esc(q.lowLabel) + '" maxlength="30"></label><label class="field"><span>Label for ' + q.scaleMax + '</span><input class="input" data-f="highLabel" value="' + esc(q.highLabel) + '" maxlength="30"></label>';
-    if (q.type === "rk") h += '<p class="note">Students put the items in order on their phones. Results show the average place of each item.</p>';
+    if (q.type === "rk") h += '<p class="note">People put the items in order on their phones. Results show the average place of each item.</p>';
     if (q.type === "th") h += '<label class="field"><span>❄ Cold pole <span class="muted">(left end)</span></span><input class="input" data-f="lowLabel" value="' + esc(q.lowLabel || "") + '" maxlength="40" placeholder="e.g. Totally disagree"></label><label class="field"><span>🔥 Hot pole <span class="muted">(right end)</span></span><input class="input" data-f="highLabel" value="' + esc(q.highLabel || "") + '" maxlength="40" placeholder="e.g. Totally agree"></label>' +
-      '<p class="note" style="grid-column:1/-1">Students slide a marker along a thermometer to show where they think it sits between the two poles. The big screen shows where the class landed and the crowd average.</p>';
-    if (q.type === "sl") h += '<label class="field"><span>Countdown</span>' + sel("timer", TIMERS_SL, q.timer || 0) + '</label><p class="note" style="align-self:end">Nothing to answer here. Use it for a welcome screen, instructions or a break. Phones show the title and point students to the big screen.</p>';
+      '<p class="note" style="grid-column:1/-1">People slide a marker along a thermometer to show where they think it sits between the two poles. The big screen shows where the room landed and the crowd average.</p>';
+    if (q.type === "sl") h += '<label class="field"><span>Countdown</span>' + sel("timer", TIMERS_SL, q.timer || 0) + '</label><p class="note" style="align-self:end">Nothing to answer here. Use it for a welcome screen, instructions or a break. Phones show the title and point people to the big screen.</p>';
     h += "</div>";
     var p = R.problems(q);
     h += p.length ? '<div class="banner warn" id="qprob">⚠ ' + p.join(" ") + "</div>" : "";
@@ -368,7 +368,7 @@
       var picked = null;
       var m = PC.modal("How should the quiz race run?", '<div class="stack-16" style="gap:12px">' +
         '<button type="button" class="mode-card" data-mode="teacher"><b>Together, led by you</b><span>One question at a time on the big screen. You start each question and reveal the answer. Works with every question in the set.</span></button>' +
-        '<button type="button" class="mode-card" data-mode="self"><b>Self-paced race</b><span>Students race through the ' + nqz + (nqz === 1 ? " quiz race question" : " quiz race questions") + ' on their own phones, each with their own timer. The big screen shows a live leaderboard, then the podium.' +
+        '<button type="button" class="mode-card" data-mode="self"><b>Self-paced race</b><span>People race through the ' + nqz + (nqz === 1 ? " quiz race question" : " quiz race questions") + ' on their own phones, each with their own timer. The big screen shows a live leaderboard, then the podium.' +
         (total > nqz ? " Other kinds of questions in this set are skipped." : "") + "</span></button></div>",
         { onClose: function () { resolve(picked); } });
       m.el.addEventListener("click", function (e) { var b = e.target.closest("[data-mode]"); if (b) { picked = b.getAttribute("data-mode"); m.close(); } });
@@ -450,7 +450,7 @@
     }
     if (!initial) { sendState(true); saveSoon(); renderLive(); }
   }
-  // Timed questions wait for the teacher to press Start, so the clock doesn't run while students are still joining
+  // Timed questions wait for the teacher to press Start, so the clock doesn't run while people are still joining
   function needsStart(q) { return q.type === "qz" || !!q.timer; }
   function startVoting(st, q) {
     st.open = true; st.openedAt = Date.now();
@@ -647,7 +647,7 @@
       (live.srv.mode === "supabase" && !live.srv.own ? '<span style="font-weight:600;color:var(--inv-muted)">Scan with your phone camera, or go to</span><span class="join-url">' + esc(short) + "</span>" +
         '<div class="roomcode"><span class="label">Room code</span><b>' + esc(s.code.replace("-", " ")) + "</b></div>"
         : '<span style="font-weight:600;color:var(--inv-muted)">Scan with your phone camera to join.</span><div class="roomcode"><span class="label">Room</span><b>' + esc(s.code.replace("-", " ")) + "</b></div>" +
-          (live.srv.mode === "demo" ? '<span class="note" style="color:var(--inv-muted)">Demo mode: open the link in another tab of this browser.</span>' : '<span class="note" style="color:var(--inv-muted)">This room uses your own server, so students need the QR code or link.</span>')) +
+          (live.srv.mode === "demo" ? '<span class="note" style="color:var(--inv-muted)">Demo mode: open the link in another tab of this browser.</span>' : '<span class="note" style="color:var(--inv-muted)">This room uses your own server, so people need the QR code or link.</span>')) +
       '<button type="button" class="btn small" data-act="copy-link" style="border-color:var(--inv-muted);color:var(--inv-ink)">Copy join link</button>' +
       '<div style="margin-top:auto">' + PC.igloo(180) + "</div></aside></div>" + footer();
     finish(); renderStage(); paintConn(); paintCrowd(); paintModBadge();
@@ -686,7 +686,7 @@
     }
     var r = R.view(s, q, { controls: true });
     var n = r.data.total, label = q.type === "wc" ? r.data.entries + (r.data.entries === 1 ? " word" : " words") + " from " + n : q.type === "qa" ? r.data.items.length + (r.data.items.length === 1 ? " question" : " questions") : n + (n === 1 ? " answer" : " answers");
-    if (needsStart(q) && !st.openedAt) el.innerHTML = '<div class="frozen"><h3>Get ready…</h3><p class="muted">Press Start when everyone’s in.' + (q.type === "qz" ? " Faster correct answers score more." : " Students get " + q.timer + " seconds.") + "</p></div>";
+    if (needsStart(q) && !st.openedAt) el.innerHTML = '<div class="frozen"><h3>Get ready…</h3><p class="muted">Press Start when everyone’s in.' + (q.type === "qz" ? " Faster correct answers score more." : " People get " + q.timer + " seconds.") + "</p></div>";
     else if ((st.hideResults && !st.revealed) || (q.type === "qz" && !st.revealed)) {
       var count = '<p class="answers-in"><b>' + n + "</b> " + (n === 1 ? "answer" : "answers") + (q.type === "qz" ? (st.open ? " in so far" : " in · time’s up!") : " in · results hidden for now") + "</p>";
       el.innerHTML = (q.options && q.options.length ? optionCards(q) : '<div class="frozen"><h3>Results are frozen for now</h3></div>') + count;
@@ -711,7 +711,7 @@
     var c = $("#connChip"); if (!c || !live) return;
     var ok = live.status === "SUBSCRIBED" && live.hostStatus === "SUBSCRIBED", bad = /ERROR|TIMED|CLOSED/.test(live.status + live.hostStatus);
     c.innerHTML = '<span class="dot' + (ok ? "" : bad ? " off" : " wait") + '"></span>' + (ok ? "Live · room " + esc(live.s.code) : bad ? "Reconnecting…" : "Connecting…") + (live.srv.mode === "demo" ? " (demo)" : "");
-    c.title = bad ? "Can't reach the server. Students' answers will arrive once it reconnects. If this keeps up, check Settings > Test connection." : "";
+    c.title = bad ? "Can't reach the server. Answers will arrive once it reconnects. If this keeps up, check Settings > Test connection." : "";
   }
   function paintCrowd() {
     var el = $("#crowd"); if (!el || !live) return;
@@ -723,7 +723,7 @@
     el.setAttribute("data-key", key);
     var shown = ids.slice(0, 24);
     el.innerHTML = shown.map(function (p) { var x = s.roster[p]; return B.svg(x.k, x.v, x.l, 44); }).join("") + (ids.length > shown.length ? '<span class="more">+' + (ids.length - shown.length) + "</span>" : "") +
-      (ids.length ? "" : '<span class="muted">Buddies show up here as students join.</span>');
+      (ids.length ? "" : '<span class="muted">Buddies show up here as people join.</span>');
   }
   function pendingCount() {
     if (!live) return 0;
@@ -755,13 +755,13 @@
   function peopleBody() {
     var s = live.s, ids = Object.keys(s.roster).filter(function (p) { return s.kicked.indexOf(p) < 0; }), now = Date.now();
     ids.sort(function (a, b) { return (s.roster[b].seen || 0) - (s.roster[a].seen || 0); });
-    return '<div class="controls"><button type="button" class="btn" data-act="lock">' + (s.locked ? "Unlock room" : "Lock room") + '</button></div><p class="note">' + (s.locked ? "Locked: nobody new can join. Students already in can keep answering." : "Lock the room once everyone’s in, so nobody else can wander in.") + "</p>" +
-      '<span class="label">Students · ' + ids.length + "</span>" +
+    return '<div class="controls"><button type="button" class="btn" data-act="lock">' + (s.locked ? "Unlock room" : "Lock room") + '</button></div><p class="note">' + (s.locked ? "Locked: nobody new can join. People already in can keep answering." : "Lock the room once everyone’s in, so nobody else can wander in.") + "</p>" +
+      '<span class="label">People · ' + ids.length + "</span>" +
       (ids.length ? ids.map(function (p) {
         var x = s.roster[p], on = now - (x.seen || 0) < PRESENT_MS;
         return '<div class="person">' + B.svg(x.k, x.v, x.l, 40) + '<span class="t">' + esc(R.buddyName(x)) + '<br><small class="muted">' + (on ? "here" : "away") + '</small></span><button type="button" class="btn small danger" data-kick="' + p + '">Remove</button></div>';
       }).join("") : '<p class="muted">Nobody yet.</p>') +
-      (s.kicked.length ? '<span class="label">Removed · ' + s.kicked.length + '</span><button type="button" class="btn small" data-act="unkick">Let removed students back in</button>' : "");
+      (s.kicked.length ? '<span class="label">Removed · ' + s.kicked.length + '</span><button type="button" class="btn small" data-act="unkick">Let removed people back in</button>' : "");
   }
   function refreshDrawer() {
     var d = $(".drawer"); if (!d) return;
@@ -777,14 +777,14 @@
     if (needPhotos(s.questions)) PC.images.preload(s.questions).then(function () { if (view === "results") renderResults(id); });
     var hasQuiz = s.questions.some(function (q) { return q.type === "qz"; });
     app.innerHTML = topBar('<button type="button" class="btn" data-act="home">← Home</button>') +
-      '<main class="page stack-16" style="gap:22px"><div><span class="label">Results</span><h1 style="font-size:38px">' + esc(s.title) + '</h1><p class="muted">' + fmtDate(s.startedAt) + " · room " + esc(s.code) + " · " + Object.keys(s.roster).length + " students" + (s.endedAt ? "" : " · still open") + '</p><p class="note" style="margin-top:6px">For checking understanding and sparking discussion, not for grades: answers are anonymous and nothing confirms who answered. <a href="privacy.html#grading" target="_blank" rel="noopener">Why?</a></p></div>' +
+      '<main class="page stack-16" style="gap:22px"><div><span class="label">Results</span><h1 style="font-size:38px">' + esc(s.title) + '</h1><p class="muted">' + fmtDate(s.startedAt) + " · room " + esc(s.code) + " · " + Object.keys(s.roster).length + " people" + (s.endedAt ? "" : " · still open") + '</p><p class="note" style="margin-top:6px">For checking understanding and sparking discussion, not for grades: answers are anonymous and nothing confirms who answered. <a href="privacy.html#grading" target="_blank" rel="noopener">Why?</a></p></div>' +
       '<div class="card stack-16"><h2 style="font-size:22px">Export</h2><div class="controls"><button type="button" class="btn primary" data-exp="pptx" data-id="' + s.id + '">PowerPoint (a slide per question)</button>' +
       '<button type="button" class="btn" data-exp="summary" data-id="' + s.id + '">Summary (print or save as PDF)</button><button type="button" class="btn" data-exp="csv" data-id="' + s.id + '">Spreadsheet (CSV)</button></div>' +
       '<p class="note">Answers are anonymous: exports show buddies and optional nicknames only, never names or emails.</p></div>' +
       s.questions.map(function (q, i) {
         var v = R.view(s, q, { reveal: true, limit: 100 });
         var im = q.image && PC.images.cached(q.image);
-        return '<section class="card stack-16"><span class="label">' + (q.type === "sl" ? "Slide " + (i + 1) + " · Info slide" : "Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + (v.data.total) + (v.data.total === 1 ? " student" : " students")) + '</span><h2 style="font-size:28px">' + esc(q.prompt) + "</h2>" +
+        return '<section class="card stack-16"><span class="label">' + (q.type === "sl" ? "Slide " + (i + 1) + " · Info slide" : "Question " + (i + 1) + " · " + R.TYPES[q.type].name + " · " + (v.data.total) + (v.data.total === 1 ? " person" : " people")) + '</span><h2 style="font-size:28px">' + esc(q.prompt) + "</h2>" +
           (im ? '<img class="photo-result" src="' + im + '" alt="' + esc(q.imageAlt || "Photo for this question") + '">' : "") + v.html + "</section>";
       }).join("") +
       (hasQuiz ? '<section class="card stack-16"><h2>Final quiz leaderboard</h2>' + (R.leaderboard(s, 10).map(function (x) { return '<div class="leader"><span class="rank">' + x.rank + "</span>" + B.svg(x.k, x.v, x.l, 44) + '<span class="who">' + esc(R.buddyName(x)) + '</span><span class="pts">' + x.pts + "</span></div>"; }).join("") || '<p class="muted">No quiz answers were revealed.</p>') + "</section>" : "") +
@@ -802,7 +802,7 @@
     var m = PC.modal("Settings", '<form class="stack-16" id="setForm" style="gap:22px">' +
       '<fieldset class="stack-16" style="gap:10px"><legend>Live connection</legend>' +
       '<label class="check"><input type="radio" name="srv" value="site"' + (choice === "site" ? " checked" : "") + (site ? "" : " disabled") + "> Poller Crowd’s shared server" + (site ? "" : ' <span class="muted">(not set up on this site yet)</span>') + "</label>" +
-      '<label class="check"><input type="radio" name="srv" value="own"' + (choice === "own" ? " checked" : "") + "> My own free project <span class=\"muted\">(your own limit, nobody else’s classes count)</span></label>" +
+      '<label class="check"><input type="radio" name="srv" value="own"' + (choice === "own" ? " checked" : "") + "> My own free project <span class=\"muted\">(your own limit, nobody else’s sessions count)</span></label>" +
       '<div class="stack-16" id="ownBox" style="gap:12px;padding-left:30px">' +
       '<div role="radiogroup" aria-label="Which service" style="display:flex;flex-wrap:wrap;gap:8px 22px"><label class="check"><input type="radio" name="prov" value="supabase"' + (own.type !== "firebase" ? " checked" : "") + "> <b>Supabase</b> <span class=\"muted\">up to 200 at once</span></label>" +
       '<label class="check"><input type="radio" name="prov" value="firebase"' + (own.type === "firebase" ? " checked" : "") + "> <b>Firebase</b> <span class=\"muted\">up to 100 at once</span></label></div>" +
@@ -813,10 +813,10 @@
       '<p class="note">From the Firebase console: Databases &amp; Storage → Realtime Database, the link at the top of the Data tab. You also paste a short set of rules once (it’s in the guide).</p></div>' +
       '<div class="controls"><button type="button" class="btn" data-test>Test connection</button><span id="testMsg" role="status"></span></div>' +
       '<p class="note"><a href="setup.html" target="_blank" rel="noopener">Step-by-step setup guide</a>, including how to let an AI assistant walk you through it.</p></div>' +
-      '<label class="check"><input type="radio" name="srv" value="demo"' + (choice === "demo" ? " checked" : "") + "> Demo mode <span class=\"muted\">(students in other tabs of this browser, for trying things out)</span></label></fieldset>" +
+      '<label class="check"><input type="radio" name="srv" value="demo"' + (choice === "demo" ? " checked" : "") + "> Demo mode <span class=\"muted\">(people in other tabs of this browser, for trying things out)</span></label></fieldset>" +
       '<fieldset class="stack-16" style="gap:6px"><legend>New questions</legend><label class="check"><input type="checkbox" name="hold"' + (st.hold ? " checked" : "") + "> Hold word cloud and Q&amp;A answers for my approval by default</label>" +
       '<label class="check"><input type="checkbox" name="liveResults"' + (st.liveResults ? " checked" : "") + "> Show results on screen as they come in (you can hide them anytime)</label></fieldset>" +
-      '<label class="field"><span>Extra banned words (one per line or separated by commas)</span><textarea class="input" name="banned" rows="3" placeholder="e.g. a nickname for a rival school">' + esc((st.banned || []).join("\n")) + '</textarea><span class="note">Common swear words and slurs are already blocked. These are added on top, on this computer.</span></label>' +
+      '<label class="field"><span>Extra banned words (one per line or separated by commas)</span><textarea class="input" name="banned" rows="3" placeholder="e.g. a nickname for a rival team">' + esc((st.banned || []).join("\n")) + '</textarea><span class="note">Common swear words and slurs are already blocked. These are added on top, on this computer.</span></label>' +
       '<fieldset class="stack-16" style="gap:8px"><legend>Your data</legend><p class="note">Question sets and results are saved only in this browser. Past sessions are deleted after ' + (+(PC.cfg.keepSessionsDays || 30)) + ' days. Download sets to back them up or share them.</p><div class="controls"><button type="button" class="btn small danger" data-wipe>Delete all past sessions</button></div></fieldset>' +
       '<div class="modal-actions"><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn primary">Save</button></div></form>', { wide: true });
     var f = m.el.querySelector("#setForm");
@@ -897,7 +897,7 @@
     }
     if (live && b.hasAttribute("data-kick")) {
       var p = b.getAttribute("data-kick"), x = live.s.roster[p];
-      if (!(await PC.confirm("Remove this student?", "The " + esc(R.buddyName(x)) + " will be sent out of the room and can’t rejoin from that phone. Their answers so far stay in the results.", "Remove", true))) return;
+      if (!(await PC.confirm("Remove this person?", "The " + esc(R.buddyName(x)) + " will be sent out of the room and can’t rejoin from that phone. Their answers so far stay in the results.", "Remove", true))) return;
       live.s.kicked.push(p); sendState(true); saveSoon(); refreshDrawer(); paintCrowd(); return;
     }
     if (live && (b.hasAttribute("data-qa-ans") || b.hasAttribute("data-qa-hide"))) {
@@ -919,7 +919,7 @@
       case "import": importDeck(); break;
       case "present": if (deck && view === "edit") Store.saveDeck(deck); startSession(id); break;
       case "resume": go("#live"); break;
-      case "end-old": var oid = PC.store.get("live"), os = Store.session(oid); if (os && await PC.confirm("End this session?", "Students will see that it’s over. Results stay in Past sessions.", "End session")) { os.endedAt = Date.now(); Store.saveSession(os); PC.store.del("live"); renderHome(); } break;
+      case "end-old": var oid = PC.store.get("live"), os = Store.session(oid); if (os && await PC.confirm("End this session?", "Everyone will see that it’s over. Results stay in Past sessions.", "End session")) { os.endedAt = Date.now(); Store.saveSession(os); PC.store.del("live"); renderHome(); } break;
       case "results": go("#results/" + id); break;
       case "del-session": if (await PC.confirm("Delete these results?", "This can’t be undone.", "Delete", true)) { if (live && live.s.id === id) stopLive(); Store.delSession(id); renderHome(); } break;
       case "add-q": addQuestion(); break;
@@ -951,7 +951,7 @@
       case "podium-next": live.s.podium.step = nextStep(); sendState(true); saveSoon(); renderStage(); break;
       case "podium-back": live.s.podium = null; sendState(true); saveSoon(); renderStage(); break;
       case "race-start": raceStart(); break;
-      case "race-end": if (live.s.race.state === "running") { if (await PC.confirm("End the race?", "Students who haven’t finished will stop where they are. Then the podium!", "End the race")) raceEnd(); } else raceEnd(); break;
+      case "race-end": if (live.s.race.state === "running") { if (await PC.confirm("End the race?", "People who haven’t finished will stop where they are. Then the podium!", "End the race")) raceEnd(); } else raceEnd(); break;
       case "end": endSession(); break;
       case "start": startVoting(curSt(), curQ()); sendState(true); saveSoon(); renderStage(); break;
       case "toggle-open": var so = curSt(); if (so.open) { so.open = false; so.endsAt = null; } else startVoting(so, curQ()); sendState(true); saveSoon(); renderStage(); break;
@@ -972,7 +972,7 @@
     var m = PC.modal("Room options", '<div class="stack-16" style="gap:10px">' +
       '<button type="button" class="btn block" data-m="fs">Full screen (projector)</button>' +
       '<button type="button" class="btn block" data-m="join">' + (s.showJoin ? "Hide" : "Show") + " the join panel</button>" +
-      '<button type="button" class="btn block" data-m="lock">' + (s.locked ? "Unlock the room" : "Lock the room (no new students)") + "</button>" +
+      '<button type="button" class="btn block" data-m="lock">' + (s.locked ? "Unlock the room" : "Lock the room (no newcomers)") + "</button>" +
       '<button type="button" class="btn block" data-m="reset">Clear answers to this question</button>' +
       '<button type="button" class="btn block" data-m="jump">Jump to a question…</button>' +
       (hasQuiz(s) ? '<button type="button" class="btn block" data-m="podium">Show the competition podium</button>' : "") +
@@ -997,7 +997,7 @@
     });
   }
   /* ---------- self-paced race ---------- */
-  // Students move through the quiz race questions on their own phones. The teacher's screen
+  // People move through the quiz race questions on their own phones. The teacher's screen
   // times each question from when the phone says it showed it, so nobody can fake a fast time,
   // and correct answers never leave this screen until the race is over.
   function raceState() {
@@ -1036,7 +1036,7 @@
     var head = '<div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center"><span class="label">Self-paced quiz race · ' + n + (n === 1 ? " question" : " questions") + '</span><span class="chip" id="statusChip"></span></div>';
     if (r.state === "lobby") {
       box.innerHTML = head + '<h1 class="q-title">Get ready to race!</h1><p class="muted" style="font-size:20px">When you press Start, everyone races through the questions on their own phone. Faster right answers score more points.</p></div>' +
-        '<div class="frozen"><h3 style="font-size:44px">' + players.length + (players.length === 1 ? " racer" : " racers") + ' ready</h3><p class="muted">Students: scan the code and pick a buddy.</p></div>' +
+        '<div class="frozen"><h3 style="font-size:44px">' + players.length + (players.length === 1 ? " racer" : " racers") + ' ready</h3><p class="muted">Scan the code and pick a buddy.</p></div>' +
         '<div class="controls" id="ctrl"><button type="button" class="btn primary big" data-act="race-start"' + (players.length ? "" : " disabled") + '>Start the race</button></div>' +
         '<div class="crowd-row"><span class="label" id="crowdLabel">In the igloo · 0</span><div class="crowd" id="crowd"></div></div>';
       paintCrowd(); paintRaceChip(); return;
@@ -1113,7 +1113,7 @@
   }
   function toggleFS() { if (document.fullscreenElement) document.exitFullscreen(); else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {}); }
   async function endSession() {
-    if (!(await PC.confirm("End the session?", "Students will see a thank-you screen. You’ll go to the results, where you can export a PowerPoint, summary or spreadsheet.", "End session"))) return;
+    if (!(await PC.confirm("End the session?", "Everyone will see a thank-you screen. You’ll go to the results, where you can export a PowerPoint, summary or spreadsheet.", "End session"))) return;
     var s = live.s; s.endedAt = Date.now(); Store.saveSession(s);
     sendState(true);
     setTimeout(function () { stopLive(); PC.store.del("live"); go("#results/" + s.id); }, 900);

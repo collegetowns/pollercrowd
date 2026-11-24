@@ -1,14 +1,14 @@
 # Poller Crowd
 
-**Warm up the lecture.** Free live polls, word clouds, quizzes, rankings and Q&A for classes and lectures. Students scan a QR code and answer from their phones: no app, no accounts, anonymous answers. A free app from [College Towns](https://www.collegetowns.org).
+**Warm up the lecture.** Free live polls, word clouds, quizzes, rankings and Q&A for classes, lectures, workshops and conference talks. The audience scans a QR code and answers from their phones: no app, no accounts, anonymous answers. A free app from [College Towns](https://www.collegetowns.org).
 
-- **Seven activities, plus info slides:** multiple choice, word cloud, rating scale, open Q&A with upvotes, timed quiz race with a leaderboard, ranking, and thermometer (students place something between two poles). Info slides show a title, notes or a break countdown with nothing to answer.
-- **Buddies:** students pick one of 10 polar buddies with 4 color patterns and 5 looks (200 combinations). Repeats are avoided automatically.
+- **Seven activities, plus info slides:** multiple choice, word cloud, rating scale, open Q&A with upvotes, timed quiz race with a leaderboard, ranking, and thermometer (people place something between two poles). Info slides show a title, notes or a break countdown with nothing to answer.
+- **Buddies:** participants pick one of 10 polar buddies with 4 color patterns and 5 looks (200 combinations). Repeats are avoided automatically.
 - **Polar Night and Polar Day** themes on every screen.
-- **Rude-word filter:** common swear words and slurs become `#!*&`. Teachers can also hold answers for approval, hide anything, and remove a student.
+- **Rude-word filter:** common swear words and slurs become `#!*&`. Presenters can also hold answers for approval, hide anything, and remove someone.
 - **Exports:** PowerPoint (a slide per question), a printable summary (save as PDF), and a spreadsheet (CSV).
-- **Private by design:** nothing is stored on a server. Question sets and results stay in the teacher's browser. Phones remind students not to type names or personal details.
-- **For learning, not grading:** answers are anonymous and nothing confirms who answered, so results aren't meant for grades or official records. `privacy.html` explains why and has a one-screen summary for school and district reviews.
+- **Private by design:** nothing is stored on a server. Question sets and results stay in the presenter's browser. Phones remind people not to type names or personal details.
+- **For learning, not grading:** answers are anonymous and nothing confirms who answered, so results aren't meant for grades or official records. `privacy.html` explains why and has a one-screen summary for school, university and organization reviews.
 - **Bring your own free connection:** Supabase (200 at once) or Firebase (100 at once), pasted into Settings on the live site or set once in `js/config.js` for your own copy.
 
 > **Setting this up with an AI assistant?** Point it at [`AGENTS.md`](AGENTS.md). It has step-by-step instructions written for assistants like Claude, ChatGPT or Copilot, for both connecting a free project and hosting your own copy. Teachers can copy a ready-made message from [`setup.html`](https://pollercrowd.collegetowns.org/setup.html#ai).
@@ -19,12 +19,12 @@
 
 | File | What it is |
 |---|---|
-| `index.html` | Landing page: students type a room code, teachers open the teacher screen |
-| `host.html` | The teacher screen (build question sets, present, results, exports) |
-| `join.html` | The student phone screen (the QR code points here) |
-| `setup.html` | Guide for teachers: connect their own free Supabase or Firebase, host a copy, or let an AI assistant walk them through it |
+| `index.html` | Landing page: participants type a room code, presenters open the presenter screen |
+| `host.html` | The presenter screen (build question sets, present, results, exports) |
+| `join.html` | The participant phone screen (the QR code points here) |
+| `setup.html` | Guide for teachers and presenters: connect their own free Supabase or Firebase, host a copy, or let an AI assistant walk them through it |
 | `AGENTS.md` | Setup instructions written for AI assistants |
-| `privacy.html` | Plain-language privacy page: where data goes, why it's not for grading, and a summary for school/district reviewers |
+| `privacy.html` | Plain-language privacy page: where data goes, why it's not for grading, and a summary for school, university and organization reviewers |
 | `js/config.js` | **The only file you edit:** your Supabase keys (or Firebase URL), GoatCounter code, feedback email |
 | `js/`, `css/`, `fonts/`, `vendor/` | The app itself, its fonts and bundled libraries (Supabase, Firebase, PptxGenJS, QR code) |
 
@@ -34,11 +34,11 @@ There's no build step. It's plain HTML, CSS and JavaScript, so you can host it a
 
 ## Step 1. Try it on your own computer (2 minutes, optional)
 
-With no Supabase keys, Poller Crowd runs in **demo mode**: the teacher screen and "students" are tabs in the same browser.
+With no Supabase keys, Poller Crowd runs in **demo mode**: the presenter screen and "participants" are tabs in the same browser.
 
 1. Open a terminal in this folder and run `python3 -m http.server 8000` (Mac and Linux have Python built in).
 2. Visit `http://localhost:8000/host.html`, press **Present** on the sample question set.
-3. Press **Copy join link** and open it in a few more tabs. Each tab is a student.
+3. Press **Copy join link** and open it in a few more tabs. Each tab is a participant.
 
 > Tip: opening the files by double-clicking won't work, because browsers block live connections between pages opened as files. Use the little server above.
 
@@ -84,9 +84,9 @@ goatcounterCode: "yourcode",   // the part before .goatcounter.com, same as on t
 
 1. Open `host.html` on your laptop, press **Present**.
 2. Scan the QR code with your phone (and a friend's). Pick buddies and answer a couple of questions.
-3. Check **People** on the teacher screen, try **Moderation**, end the session and download the PowerPoint.
+3. Check **People** on the presenter screen, try **Moderation**, end the session and download the PowerPoint.
 
-Before each class, glance at the green **Live** chip at the top of the teacher screen. If it says *Reconnecting…*, your free Supabase project may be asleep (see below).
+Before each class or talk, glance at the green **Live** chip at the top of the presenter screen. If it says *Reconnecting…*, your free Supabase project may be asleep (see below).
 
 ---
 
@@ -94,25 +94,25 @@ Before each class, glance at the green **Live** chip at the top of the teacher s
 
 | Supabase free plan | Limit | What it means here |
 |---|---|---|
-| Concurrent connections | 200 | Up to ~199 students at once across **all** classes using your project |
-| Messages per second | 100 | Answers go only to the teacher's screen, and screen updates to phones are batched, so a class of 100 stays well under |
-| Project pausing | after about a week unused | Open the Supabase dashboard and press **Restore** before class |
+| Concurrent connections | 200 | Up to ~199 participants at once across **all** sessions using your project |
+| Messages per second | 100 | Answers go only to the presenter's screen, and screen updates to phones are batched, so a room of 100 stays well under |
+| Project pausing | after about a week unused | Open the Supabase dashboard and press **Restore** before you present |
 | Active free projects | 2 per account | |
 
-With Firebase instead: 100 devices at once (a hard cap on the free plan, including the teacher's screen), no pausing, and 10 GB of downloads a month. A room's live update is usually a few KB, so normal class use stays far below that.
+With Firebase instead: 100 devices at once (a hard cap on the free plan, including the presenter's screen), no pausing, and 10 GB of downloads a month. A room's live update is usually a few KB, so normal use stays far below that.
 
-**Lots of teachers using your site at once?** Each teacher can connect their **own** free Supabase project in **Settings** (the gear icon on the teacher screen). Their rooms then run on their project with their own allowance (200 on Supabase, 100 on Firebase), and the QR code tells phones where to connect. The step-by-step guide for them is `setup.html`, linked from the landing page and from Settings. Rooms on a teacher's own project need the QR code or link; the room code alone points to your shared project.
+**Lots of people presenting from your site at once?** Each one can connect their **own** free Supabase project in **Settings** (the gear icon on the presenter screen). Their rooms then run on their project with their own allowance (200 on Supabase, 100 on Firebase), and the QR code tells phones where to connect. The step-by-step guide for them is `setup.html`, linked from the landing page and from Settings. Rooms on a teacher's own project need the QR code or link; the room code alone points to your shared project.
 
 ## How it works (for the curious)
 
-- The teacher screen makes a fresh **signing key** for each room, and the room code (e.g. `IGLOO-482`) is derived from that key. Every update the phones receive is signed. A prankster who sends fake "the quiz is over" messages gets ignored, because phones check the signature.
-- Phones send answers to the teacher's screen as separate messages (Supabase HTTP broadcast, or a short-lived entry the teacher's screen reads and deletes on Firebase). Phones only listen for the teacher's signed updates, so message counts stay low.
-- Each phone has a random private ID. The teacher's screen only ever sees a one-way hash of it, which is how "one answer per phone", the buddy patterns and **Remove** work, without names.
-- Question sets and results are saved in the teacher's browser (`localStorage`). Finished sessions are deleted after 30 days (`keepSessionsDays` in `config.js`). **Download** a question set to back it up, or to share it with a colleague, who can **Import** it.
+- The presenter screen makes a fresh **signing key** for each room, and the room code (e.g. `IGLOO-482`) is derived from that key. Every update the phones receive is signed. A prankster who sends fake "the quiz is over" messages gets ignored, because phones check the signature.
+- Phones send answers to the presenter's screen as separate messages (Supabase HTTP broadcast, or a short-lived entry the presenter's screen reads and deletes on Firebase). Phones only listen for the teacher's signed updates, so message counts stay low.
+- Each phone has a random private ID. The presenter's screen only ever sees a one-way hash of it, which is how "one answer per phone", the buddy patterns and **Remove** work, without names.
+- Question sets and results are saved in the presenter's browser (`localStorage`). Finished sessions are deleted after 30 days (`keepSessionsDays` in `config.js`). **Download** a question set to back it up, or to share it with a colleague, who can **Import** it.
 
-## Sharing question sets with other teachers
+## Sharing question sets with colleagues
 
-On the teacher home screen, **Download** saves a question set as a small `.pollercrowd` file (it also opens if renamed to `.json`). Email it to a colleague; they press **Import a set**.
+On the presenter home screen, **Download** saves a question set as a small `.pollercrowd` file (it also opens if renamed to `.json`). Email it to a colleague; they press **Import a set**.
 
 ## Updating the bundled libraries
 

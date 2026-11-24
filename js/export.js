@@ -17,7 +17,8 @@
   /* ---------- CSV ---------- */
   function csvCell(v) { v = v == null ? "" : String(v); return /[",\n\r]/.test(v) || /^[=+\-@]/.test(v) ? '"' + (/^[=+\-@]/.test(v) ? "'" : "") + v.replace(/"/g, '""') + '"' : v; }
   function csv(s) {
-    var rows = [["Poller Crowd results"], ["Session", s.title], ["Date", dateStr(s.startedAt)], ["Room", s.code], ["Students", people(s)], [],
+    var rows = [["Poller Crowd results"], ["Session", s.title], ["Date", dateStr(s.startedAt)], ["Room", s.code], ["Students", people(s)],
+      ["Note", "Anonymous answers for checking understanding. Not suitable for grading: nothing confirms who answered."], [],
       ["Question #", "Type", "Question", "Answer / item / word", "Count", "Percent of students", "Notes"]];
     s.questions.forEach(function (q, i) {
       if (q.type === "sl") return;
@@ -55,7 +56,7 @@
     var html = '<!doctype html><html lang="en" data-theme="day"><head><meta charset="utf-8"><title>' + e(s.title) + " · Poller Crowd summary</title>" + css +
       "<style>body{background:#fff;color:#0B1F3A;font-size:15px}main{max-width:880px;margin:0 auto;padding:28px 24px}section{break-inside:avoid;page-break-inside:avoid;border-top:2px solid #CFE6F7;padding:22px 0}h1{font-size:34px}h2{font-size:24px;margin:6px 0 16px}" +
       ".label{color:#1E66A6}.cloud{min-height:0}.bar-head{font-size:17px}.bar-num{font-size:20px}.qa-text{font-size:16px}.frozen{min-height:0;padding:18px}.noprint{margin:12px 0 0}@media print{.noprint{display:none}main{padding:0}}</style></head><body><main>" +
-      '<p class="label">Poller Crowd summary</p><h1>' + e(s.title) + '</h1><p class="muted">' + dateStr(s.startedAt) + " · room " + e(s.code) + " · " + people(s) + ' students · answers are anonymous</p><p class="noprint controls"><a class="btn" href="' + PC.siteBase() + 'host.html">← Back to Poller Crowd</a><button class="btn primary" onclick="print()">Print or save as PDF</button></p>' +
+      '<p class="label">Poller Crowd summary</p><h1>' + e(s.title) + '</h1><p class="muted">' + dateStr(s.startedAt) + " · room " + e(s.code) + " · " + people(s) + ' students · answers are anonymous · for checking understanding, not for grading</p><p class="noprint controls"><a class="btn" href="' + PC.siteBase() + 'host.html">← Back to Poller Crowd</a><button class="btn primary" onclick="print()">Print or save as PDF</button></p>' +
       body + '<p class="noprint controls" style="margin-top:20px"><a class="btn primary" href="' + PC.siteBase() + 'host.html">← Back to Poller Crowd</a><button class="btn" onclick="print()">Print or save as PDF</button></p><p class="muted" style="margin-top:20px">Made with Poller Crowd · Powered by College Towns</p></main></body></html>';
     var w = window.open("", "_blank");
     if (w) { w.document.open(); w.document.write(html); w.document.close(); }
@@ -126,6 +127,7 @@
     t.addText("Warm up the lecture", { x: 2.6, y: 1.6, w: 8, h: 0.4, fontFace: BODY, fontSize: 16, bold: true, color: C.warmText });
     t.addText(s.title, { x: 0.8, y: 2.9, w: 11.7, h: 1.4, fontFace: H, fontSize: 44, bold: true, color: C.ink, valign: "top" });
     t.addText(dateStr(s.startedAt) + "  ·  " + people(s) + " students  ·  " + s.questions.length + " questions", { x: 0.8, y: 4.4, w: 11.7, h: 0.5, fontFace: BODY, fontSize: 18, color: C.muted });
+    t.addText("Anonymous answers for checking understanding, not for grading.", { x: 0.8, y: 4.9, w: 11.7, h: 0.4, fontFace: BODY, fontSize: 14, italic: true, color: C.muted });
     var buddies = Object.keys(s.roster || {}).slice(0, 14);
     for (var bi = 0; bi < buddies.length; bi++) {
       var r0 = s.roster[buddies[bi]], png = await svgToPng(B.svg(r0.k, r0.v, r0.l, 240), 240);

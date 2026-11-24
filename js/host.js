@@ -777,7 +777,7 @@
     if (needPhotos(s.questions)) PC.images.preload(s.questions).then(function () { if (view === "results") renderResults(id); });
     var hasQuiz = s.questions.some(function (q) { return q.type === "qz"; });
     app.innerHTML = topBar('<button type="button" class="btn" data-act="home">← Home</button>') +
-      '<main class="page stack-16" style="gap:22px"><div><span class="label">Results</span><h1 style="font-size:38px">' + esc(s.title) + '</h1><p class="muted">' + fmtDate(s.startedAt) + " · room " + esc(s.code) + " · " + Object.keys(s.roster).length + " students" + (s.endedAt ? "" : " · still open") + "</p></div>" +
+      '<main class="page stack-16" style="gap:22px"><div><span class="label">Results</span><h1 style="font-size:38px">' + esc(s.title) + '</h1><p class="muted">' + fmtDate(s.startedAt) + " · room " + esc(s.code) + " · " + Object.keys(s.roster).length + " students" + (s.endedAt ? "" : " · still open") + '</p><p class="note" style="margin-top:6px">For checking understanding and sparking discussion, not for grades: answers are anonymous and nothing confirms who answered. <a href="privacy.html#grading" target="_blank" rel="noopener">Why?</a></p></div>' +
       '<div class="card stack-16"><h2 style="font-size:22px">Export</h2><div class="controls"><button type="button" class="btn primary" data-exp="pptx" data-id="' + s.id + '">PowerPoint (a slide per question)</button>' +
       '<button type="button" class="btn" data-exp="summary" data-id="' + s.id + '">Summary (print or save as PDF)</button><button type="button" class="btn" data-exp="csv" data-id="' + s.id + '">Spreadsheet (CSV)</button></div>' +
       '<p class="note">Answers are anonymous: exports show buddies and optional nicknames only, never names or emails.</p></div>' +

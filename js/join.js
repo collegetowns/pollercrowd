@@ -162,7 +162,7 @@
         var n = count[kk] || 0, fv2 = freePattern(kk, "none", taken);
         return '<button type="button" class="tile" role="radio" aria-checked="' + (kk === k) + '" aria-label="' + B.NAMES[kk] + (n ? ", " + n + " picked" : "") + '" data-kind="' + kk + '">' + B.svg(kk, kk === k ? v : (fv2 < 0 ? 0 : fv2), kk === k ? l : "none", 46, B.NAMES[kk]) + (n ? '<span class="count">' + n + "</span>" : "") + "</button>";
       }).join("") + "</div>" +
-      '<label class="field"><span>Nickname <span class="muted">(optional, only shows on quiz leaderboards)</span></span><input id="nickIn" class="input" maxlength="16" autocomplete="off" placeholder="Stay anonymous" value="' + esc(drafts.nick != null ? drafts.nick : room.nick || "") + '"></label>' +
+      '<label class="field"><span>Nickname <span class="muted">(optional, only shows on quiz leaderboards; pick a fun one, not your real name)</span></span><input id="nickIn" class="input" maxlength="16" autocomplete="off" placeholder="Stay anonymous" value="' + esc(drafts.nick != null ? drafts.nick : room.nick || "") + '"></label>' +
       '<button type="button" class="btn primary big block" data-act="enter">' + (room.b ? "Save my buddy" : "Into the igloo →") + "</button>";
   }
 
@@ -217,13 +217,13 @@
     }
     if (q.type === "wc") {
       var words = room.words[q.id] || [], max = q.maxWords || 1, left = max - words.length;
-      if (q.open && left > 0) h += '<form id="wordForm" class="stack-16" style="gap:8px"><label class="field"><span>Your word' + (max > 1 ? " (" + left + " left)" : "") + '</span><div style="display:flex;gap:10px"><input id="wordIn" class="input" maxlength="25" autocomplete="off" autocapitalize="none" placeholder="Type a word" value="' + esc(drafts.w || "") + '" style="font:600 22px var(--display)"><button class="btn primary" type="submit">Send</button></div></label><span class="note" id="wordCount" style="align-self:flex-end"></span></form>';
+      if (q.open && left > 0) h += '<form id="wordForm" class="stack-16" style="gap:8px"><label class="field"><span>Your word' + (max > 1 ? " (" + left + " left)" : "") + '</span><div style="display:flex;gap:10px"><input id="wordIn" class="input" maxlength="25" autocomplete="off" autocapitalize="none" placeholder="Type a word" value="' + esc(drafts.w || "") + '" style="font:600 22px var(--display)"><button class="btn primary" type="submit">Send</button></div></label><div style="display:flex;justify-content:space-between;gap:10px"><span class="note">No names or personal info, please.</span><span class="note" id="wordCount"></span></div></form>';
       if (words.length) h += '<div class="stack-16" style="gap:8px"><span class="note">You sent</span><div class="controls">' + words.map(function (w) { return '<span class="chip" style="background:var(--inv-bg);color:var(--inv-ink);font:600 17px var(--display)">' + esc(w) + "</span>"; }).join("") + "</div></div>";
       h += q.open ? (left > 0 ? "" : '<div class="sent">✓ All your words are in. Watch them grow on the big screen!</div>') : '<div class="sent" style="color:var(--muted)">Answers are closed.</div>';
     }
     if (q.type === "qa") {
       var asked = room.asked[q.id] || 0, ups = room.ups[q.id] || {};
-      if (q.open && asked < 3) h += '<form id="askForm" class="stack-16" style="gap:8px"><label class="field"><span>Ask a question (anonymous)</span><textarea id="askIn" class="input" rows="2" maxlength="160" placeholder="What’s still foggy?">' + esc(drafts.a || "") + '</textarea></label><button class="btn primary block" type="submit">Send question</button></form>';
+      if (q.open && asked < 3) h += '<form id="askForm" class="stack-16" style="gap:8px"><label class="field"><span>Ask a question (anonymous)</span><textarea id="askIn" class="input" rows="2" maxlength="160" placeholder="What’s still foggy?">' + esc(drafts.a || "") + '</textarea></label><span class="note">Don’t include your name or anything personal about you or anyone else.</span><button class="btn primary block" type="submit">Send question</button></form>';
       else if (q.open) h += '<div class="sent">You’ve asked 3 questions. Upvote the ones you want answered!</div>';
       var list = q.qa || [];
       h += '<div class="stack-16" style="gap:8px"><span class="label">Class questions · ' + list.length + "</span>" + (list.length ? list.map(function (x) {

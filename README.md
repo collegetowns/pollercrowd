@@ -7,7 +7,8 @@
 - **Polar Night and Polar Day** themes on every screen.
 - **Rude-word filter:** common swear words and slurs become `#!*&`. Teachers can also hold answers for approval, hide anything, and remove a student.
 - **Exports:** PowerPoint (a slide per question), a printable summary (save as PDF), and a spreadsheet (CSV).
-- **Private by design:** nothing is stored on a server. Question sets and results stay in the teacher's browser.
+- **Private by design:** nothing is stored on a server. Question sets and results stay in the teacher's browser. Phones remind students not to type names or personal details.
+- **For learning, not grading:** answers are anonymous and nothing confirms who answered, so results aren't meant for grades or official records. `privacy.html` explains why and has a one-screen summary for school and district reviews.
 - **Bring your own free connection:** Supabase (200 at once) or Firebase (100 at once), pasted into Settings on the live site or set once in `js/config.js` for your own copy.
 
 > **Setting this up with an AI assistant?** Point it at [`AGENTS.md`](AGENTS.md). It has step-by-step instructions written for assistants like Claude, ChatGPT or Copilot, for both connecting a free project and hosting your own copy. Teachers can copy a ready-made message from [`setup.html`](https://pollercrowd.collegetowns.org/setup.html#ai).
@@ -23,7 +24,7 @@
 | `join.html` | The student phone screen (the QR code points here) |
 | `setup.html` | Guide for teachers: connect their own free Supabase or Firebase, host a copy, or let an AI assistant walk them through it |
 | `AGENTS.md` | Setup instructions written for AI assistants |
-| `privacy.html` | Plain-language privacy page |
+| `privacy.html` | Plain-language privacy page: where data goes, why it's not for grading, and a summary for school/district reviewers |
 | `js/config.js` | **The only file you edit:** your Supabase keys (or Firebase URL), GoatCounter code, feedback email |
 | `js/`, `css/`, `fonts/`, `vendor/` | The app itself, its fonts and bundled libraries (Supabase, Firebase, PptxGenJS, QR code) |
 

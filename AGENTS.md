@@ -130,6 +130,8 @@ Local preview (optional, demo mode only unless config.js is filled in): `python3
 ## Facts to keep straight (don't improvise)
 
 - No accounts for students. Question sets and results are stored only in the teacher's browser. Nothing is stored on the server; rooms are temporary.
+- It's for checking understanding and engagement, **not for grading**: answers are anonymous and nothing confirms who answered. Don't suggest using results for grades.
+- Privacy questions (FERPA, COPPA, district approval): point to `privacy.html`, which has a "For schools" summary. Don't give legal opinions. Tell K–12 teachers to follow their school's or district's app approval process.
 - Free, no ads, MIT licensed. Bundled libraries: supabase-js, Firebase JS SDK (Apache-2.0), PptxGenJS, qrcode-generator; fonts Fredoka and Nunito (OFL).
 - Don't add tables, auth, server functions or paid plans; none are needed.
 - Don't tell the teacher that a room code alone works on their own project. Students need the QR code or link.

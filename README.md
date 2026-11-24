@@ -90,13 +90,28 @@ Before each class or talk, glance at the green **Live** chip at the top of the p
 
 ---
 
+## Keeping your Supabase project awake
+
+Supabase pauses free projects that see too little **database** activity in a week. Poller Crowd only uses live messages, so even regular classes might not count. The included GitHub Action (`.github/workflows/keep-awake.yml`) runs one tiny read-only query every day:
+
+1. In the Supabase dashboard, open **SQL Editor**, paste this and press **Run** (once):
+   ```sql
+   create or replace function public.keep_awake() returns timestamptz
+     language sql stable as $$ select now() $$;
+   grant execute on function public.keep_awake() to anon;
+   ```
+   It only returns the current time. Nothing is stored and no data is exposed.
+2. On GitHub, open the **Actions** tab. If you forked the repository, press **Enable workflows** (scheduled jobs are off in forks until you do). Pick **Keep Supabase awake → Run workflow** once to check it goes green.
+
+It reads the URL and key from `js/config.js`. If the project is ever paused or unreachable, the run fails and GitHub emails you, so you hear about it before a class does. With Firebase, nothing is needed: it doesn't pause.
+
 ## Limits and how Poller Crowd stays inside them
 
 | Supabase free plan | Limit | What it means here |
 |---|---|---|
 | Concurrent connections | 200 | Up to ~199 participants at once across **all** sessions using your project |
 | Messages per second | 100 | Answers go only to the presenter's screen, and screen updates to phones are batched, so a room of 100 stays well under |
-| Project pausing | after about a week unused | Open the Supabase dashboard and press **Restore** before you present |
+| Project pausing | after about a week without database activity | The keep-awake job above prevents it. If it happens anyway, open the Supabase dashboard and press **Restore** |
 | Active free projects | 2 per account | |
 
 With Firebase instead: 100 devices at once (a hard cap on the free plan, including the presenter's screen), no pausing, and 10 GB of downloads a month. A room's live update is usually a few KB, so normal use stays far below that.

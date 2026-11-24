@@ -163,10 +163,10 @@
      ========================================================= */
   function renderHome() {
     var decks = Store.decks(), sessions = Store.sessions(), liveId = PC.store.get("live"), ls = liveId && Store.session(liveId);
-    app.innerHTML = topBar() + '<main class="page stack-16" style="gap:22px">' + serverBanner() +
+    app.innerHTML = topBar() + '<main class="page stack-16" style="gap:22px">' + serverBanner() + backupBanner() +
       (ls && !ls.endedAt ? '<div class="banner warn" style="align-items:center;justify-content:space-between;flex-wrap:wrap"><span><b>A live session is still open:</b> ' + esc(ls.title) + " · room " + esc(ls.code) + '</span><span class="controls"><button type="button" class="btn primary" data-act="resume">Back to the room</button><button type="button" class="btn" data-act="end-old">End it</button></span></div>' : "") +
       '<section class="stack-16"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between"><h1 style="font-size:34px">Your question sets</h1><div class="controls">' +
-      '<button type="button" class="btn" data-act="import">Import a set</button><button type="button" class="btn primary" data-act="new-deck">+ New question set</button></div></div>' +
+      (decks.length ? '<button type="button" class="btn" data-act="backup-all" title="Download every question set, with photos, in one file">Back up all</button>' : "") + '<button type="button" class="btn" data-act="import" title="Open a .pollercrowd set or backup file">Import</button><button type="button" class="btn primary" data-act="new-deck">+ New question set</button></div></div>' +
       (decks.length ? decks.map(function (d) {
         return '<div class="deck-row"><div class="t"><b style="font-size:19px">' + esc(d.title || "Untitled") + '</b><div class="muted">' + d.n + (d.n === 1 ? " question" : " questions") + " · edited " + fmtDate(d.updated) + '</div></div><div class="controls">' +
           '<button type="button" class="btn primary" data-act="present" data-id="' + d.id + '">Present</button><button type="button" class="btn" data-act="edit" data-id="' + d.id + '">Edit</button>' +
@@ -424,8 +424,8 @@
     live.conn = PC.connect(srv);
     live.conn.join(s.code, "teacher", {
       onMessage: onStudentMessage,
-      onStatus: function (st) { live.status = st; paintConn(); if (st === "SUBSCRIBED") sendState(true); },
-      onHostStatus: function (st) { live.hostStatus = st; paintConn(); }
+      onStatus: function (st, d) { live.status = st; checkFull(st, d); paintConn(); if (st === "SUBSCRIBED") sendState(true); },
+      onHostStatus: function (st, d) { live.hostStatus = st; checkFull(st, d); paintConn(); }
     });
     live.tick = setInterval(tick, 1000);
     await PC.images.preload(s.questions);
@@ -707,10 +707,22 @@
     var st = curSt();
     if (curQ().type === "sl") { var bt = $("#bigTimer b"); if (bt && st.open && st.endsAt) bt.textContent = fmtClock(st.endsAt - Date.now()); t.textContent = ""; return; } t.textContent = st.open && st.endsAt ? " · " + Math.max(0, Math.ceil((st.endsAt - Date.now()) / 1000)) + "s" : "";
   }
+  // The server is at its limit of people at once: say so plainly, once
+  function checkFull(st, d) {
+    if (st === "SUBSCRIBED") { live.full = false; return; }
+    if (!/ERROR|TIMED|CLOSED/.test(st) || !PC.isFull(d)) return;
+    live.full = true;
+    if (live.toldFull) return; live.toldFull = true;
+    var n = PC.capacity(live.srv);
+    PC.modal("The connection is full", "<p>" + (live.srv.own ? "Your own " + (live.srv.mode === "firebase" ? "Firebase" : "Supabase") + " project handles about " + n + " devices at once, and it’s at that limit." : "Poller Crowd’s free shared connection handles about " + n + " people at once, counting every room using it right now, and it’s full.") +
+      "</p><p>People already in can keep going. Anyone else will see “This room is full” and will get in automatically as spots open.</p>" +
+      (live.srv.own ? "" : '<p>To stop this happening, <a href="setup.html" target="_blank" rel="noopener">set up your own free connection</a> (about 5 minutes). Then the limit is yours alone.</p>') +
+      '<div class="modal-actions"><button type="button" class="btn primary" data-close>OK</button></div>');
+  }
   function paintConn() {
     var c = $("#connChip"); if (!c || !live) return;
     var ok = live.status === "SUBSCRIBED" && live.hostStatus === "SUBSCRIBED", bad = /ERROR|TIMED|CLOSED/.test(live.status + live.hostStatus);
-    c.innerHTML = '<span class="dot' + (ok ? "" : bad ? " off" : " wait") + '"></span>' + (ok ? "Live · room " + esc(live.s.code) : bad ? "Reconnecting…" : "Connecting…") + (live.srv.mode === "demo" ? " (demo)" : "");
+    c.innerHTML = '<span class="dot' + (ok ? "" : bad ? " off" : " wait") + '"></span>' + (ok ? "Live · room " + esc(live.s.code) : live.full ? "Connection full" : bad ? "Reconnecting…" : "Connecting…") + (live.srv.mode === "demo" ? " (demo)" : "");
     c.title = bad ? "Can't reach the server. Answers will arrive once it reconnects. If this keeps up, check Settings > Test connection." : "";
   }
   function paintCrowd() {
@@ -817,7 +829,7 @@
       '<fieldset class="stack-16" style="gap:6px"><legend>New questions</legend><label class="check"><input type="checkbox" name="hold"' + (st.hold ? " checked" : "") + "> Hold word cloud and Q&amp;A answers for my approval by default</label>" +
       '<label class="check"><input type="checkbox" name="liveResults"' + (st.liveResults ? " checked" : "") + "> Show results on screen as they come in (you can hide them anytime)</label></fieldset>" +
       '<label class="field"><span>Extra banned words (one per line or separated by commas)</span><textarea class="input" name="banned" rows="3" placeholder="e.g. a nickname for a rival team">' + esc((st.banned || []).join("\n")) + '</textarea><span class="note">Common swear words and slurs are already blocked. These are added on top, on this computer.</span></label>' +
-      '<fieldset class="stack-16" style="gap:8px"><legend>Your data</legend><p class="note">Question sets and results are saved only in this browser. Past sessions are deleted after ' + (+(PC.cfg.keepSessionsDays || 30)) + ' days. Download sets to back them up or share them.</p><div class="controls"><button type="button" class="btn small danger" data-wipe>Delete all past sessions</button></div></fieldset>' +
+      '<fieldset class="stack-16" style="gap:8px"><legend>Your data</legend><p class="note">Question sets and results are saved only in this browser. Past sessions are deleted after ' + (+(PC.cfg.keepSessionsDays || 30)) + ' days. Back them up now and then: a backup file has every set and its photos, and <b>Import</b> brings them back on any computer.</p><div class="controls"><button type="button" class="btn small" data-act="backup-all">Back up all question sets</button><button type="button" class="btn small danger" data-wipe>Delete all past sessions</button></div></fieldset>' +
       '<div class="modal-actions"><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn primary">Save</button></div></form>', { wide: true });
     var f = m.el.querySelector("#setForm");
     function syncOwn() {
@@ -862,25 +874,70 @@
   }
   window.PCDownload = downloadFile;
   function fileSafe(s) { return String(s || "poller-crowd").replace(/[\\/:*?"<>|]+/g, "").trim().slice(0, 60) || "poller-crowd"; }
+  // Turn one set from a file into a fresh deck (new photo ids, only known question types, sane lengths)
+  async function deckFromFile(d, pics, newIds) {
+    var src = (d.questions || []).filter(function (q) { return q && R.TYPES[q.type]; });
+    for (var i = 0; i < src.length; i++) { // save each photo once, even if several sets share it
+      var pid = src[i].image;
+      if (pid && !newIds[pid] && /^data:image\/(jpeg|png|webp|gif);base64,/.test(String(pics[pid] || ""))) newIds[pid] = await PC.images.save(pics[pid]);
+    }
+    var qs = src.map(function (q) {
+      var n = R.blank(q.type); Object.keys(n).forEach(function (k) { if (k !== "id" && k !== "image" && k !== "imageAlt" && q[k] != null) n[k] = q[k]; });
+      if (q.image && newIds[q.image]) { n.image = newIds[q.image]; n.imageAlt = String(q.imageAlt || "").slice(0, 160); }
+      n.prompt = String(n.prompt || "").slice(0, 200); if (n.options) n.options = n.options.slice(0, 8).map(function (o) { return String(o || "").slice(0, 80); });
+      return n;
+    });
+    return { id: PC.uid(8), title: String(d.title || "Imported set").slice(0, 80), questions: qs };
+  }
   function importDeck() {
     var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".pollercrowd,.json,application/json,text/plain";
     inp.onchange = async function () {
       try {
         var d = JSON.parse(await inp.files[0].text());
-        if (!d || !Array.isArray(d.questions)) throw 0;
-        var pics = d.images && typeof d.images === "object" ? d.images : {}, newIds = {};
-        for (var pid in pics) { if (/^data:image\/(jpeg|png|webp|gif);base64,/.test(String(pics[pid]))) newIds[pid] = await PC.images.save(pics[pid]); }
-        var qs = d.questions.filter(function (q) { return q && R.TYPES[q.type]; }).map(function (q) {
-          var n = R.blank(q.type); Object.keys(n).forEach(function (k) { if (k !== "id" && q[k] != null) n[k] = q[k]; });
-          if (q.image && newIds[q.image]) { n.image = newIds[q.image]; n.imageAlt = String(q.imageAlt || "").slice(0, 160); }
-          n.prompt = String(n.prompt || "").slice(0, 200); if (n.options) n.options = n.options.slice(0, 8).map(function (o) { return String(o || "").slice(0, 80); });
-          return n;
-        });
-        var deckNew = { id: PC.uid(8), title: String(d.title || "Imported set").slice(0, 80), questions: qs };
-        Store.saveDeck(deckNew); PC.toast("Imported “" + deckNew.title + "”."); renderHome();
-      } catch (e) { PC.toast("That file isn’t a Poller Crowd question set."); }
+        var pics = d && d.images && typeof d.images === "object" ? d.images : {}, newIds = {};
+        var sets = d && Array.isArray(d.sets) ? d.sets : d && Array.isArray(d.questions) ? [d] : null;
+        if (!sets || !sets.length) throw 0;
+        var made = [];
+        for (var k = 0; k < sets.length && k < 200; k++) {
+          if (!sets[k] || !Array.isArray(sets[k].questions)) continue;
+          var nd = await deckFromFile(sets[k], pics, newIds); Store.saveDeck(nd); markBackedUp([nd.id]); made.push(nd.title);
+        }
+        if (!made.length) throw 0;
+        PC.toast(made.length === 1 ? "Imported “" + made[0] + "”." : "Imported " + made.length + " question sets."); renderHome();
+      } catch (e) { PC.toast("That file isn’t a Poller Crowd question set or backup."); }
     };
     inp.click();
+  }
+
+  /* ---------- backups: question sets live only in this browser ---------- */
+  function markBackedUp(ids) { var b = PC.store.get("backedUp", {}); ids.forEach(function (id) { b[id] = Date.now(); }); PC.store.set("backedUp", b); }
+  function isSample(d) { return /^Sample: /.test(d.title || ""); }
+  function unbacked() { var b = PC.store.get("backedUp", {}); return Store.decks().filter(function (d) { return !isSample(d) && d.n > 0 && (d.updated || 0) > (b[d.id] || 0) + 2000; }); }
+  async function packDecks(decks) {
+    var pics = {}, sets = [];
+    for (var i = 0; i < decks.length; i++) {
+      var de = Store.deck(decks[i].id); if (!de) continue;
+      await PC.images.preload(de.questions);
+      de.questions.forEach(function (q) { if (q.image && PC.images.cached(q.image)) pics[q.image] = PC.images.cached(q.image); });
+      sets.push({ title: de.title, questions: de.questions });
+    }
+    return { sets: sets, images: pics };
+  }
+  async function backupAll() {
+    var decks = Store.decks(); if (!decks.length) { PC.toast("No question sets to back up yet."); return; }
+    var p = await packDecks(decks), d = new Date();
+    downloadFile("Poller Crowd backup " + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".pollercrowd",
+      JSON.stringify({ app: "Poller Crowd", version: 1, backup: true, sets: p.sets, images: p.images }, null, 1));
+    markBackedUp(decks.map(function (x) { return x.id; })); PC.store.del("backupSnooze");
+    PC.toast("Backup downloaded: " + p.sets.length + (p.sets.length === 1 ? " set" : " sets") + ". Keep it somewhere safe, like a cloud drive."); if (view === "home") renderHome();
+  }
+  function backupBanner() {
+    var u = unbacked(); if (!u.length) return "";
+    var oldest = Math.min.apply(null, u.map(function (d) { return d.updated || Date.now(); })), snooze = PC.store.get("backupSnooze", 0);
+    if (Date.now() < snooze) return "";
+    if (u.length < 3 && Date.now() - oldest < 2 * 864e5) return ""; // don't nag about a set made a minute ago
+    return '<div class="banner" style="align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px"><span><b>Back up your question sets.</b> They’re saved only in this browser, so clearing browser data or switching computers would lose them. ' +
+      u.length + (u.length === 1 ? " set has" : " sets have") + ' changes that aren’t backed up.</span><span class="controls"><button type="button" class="btn small primary" data-act="backup-all">Download a backup</button><button type="button" class="btn small" data-act="backup-later">Remind me next week</button></span></div>';
   }
 
   /* =========================================================
@@ -915,8 +972,10 @@
       case "export-deck":
         var de = Store.deck(id); await PC.images.preload(de.questions);
         var pics = {}; de.questions.forEach(function (q) { if (q.image && PC.images.cached(q.image)) pics[q.image] = PC.images.cached(q.image); });
-        downloadFile(fileSafe(de.title) + ".pollercrowd", JSON.stringify({ app: "Poller Crowd", version: 1, title: de.title, questions: de.questions, images: pics }, null, 1)); break;
+        downloadFile(fileSafe(de.title) + ".pollercrowd", JSON.stringify({ app: "Poller Crowd", version: 1, title: de.title, questions: de.questions, images: pics }, null, 1)); markBackedUp([id]); if (view === "home") renderHome(); break;
       case "import": importDeck(); break;
+      case "backup-all": backupAll(); break;
+      case "backup-later": PC.store.set("backupSnooze", Date.now() + 7 * 864e5); renderHome(); break;
       case "present": if (deck && view === "edit") Store.saveDeck(deck); startSession(id); break;
       case "resume": go("#live"); break;
       case "end-old": var oid = PC.store.get("live"), os = Store.session(oid); if (os && await PC.confirm("End this session?", "Everyone will see that it’s over. Results stay in Past sessions.", "End session")) { os.endedAt = Date.now(); Store.saveSession(os); PC.store.del("live"); renderHome(); } break;

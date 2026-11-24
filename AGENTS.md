@@ -72,7 +72,7 @@ Firebase security rules (copy exactly):
 }
 ```
 
-Why these are OK to be public: participants join without accounts, so rooms must be readable and writable, but only under `pc/`, only as size-limited strings, and messages can't be overwritten. The person's room updates are cryptographically signed (ECDSA) and phones ignore anything unsigned. Each room is deleted when the session ends. Firebase may still email a "public rules" warning; that's expected.
+Why these are OK to be public: participants join without accounts, so rooms must be readable and writable, but only under `pc/`, only as size-limited strings, and messages can't be overwritten. The presenter's room updates are cryptographically signed (ECDSA) and phones ignore anything unsigned. Each room is deleted when the session ends. Firebase may still email a "public rules" warning; that's expected.
 
 ### A3. Connect it in Poller Crowd
 1. Open https://pollercrowd.collegetowns.org/host.html (or their own copy).
@@ -123,7 +123,8 @@ Good for: a school, university or organization web address, setting the connecti
      ```
    - **Netlify / Cloudflare Pages:** drag-and-drop the folder or connect the repo. No build command; publish directory is the repo root.
    - **Any web server:** upload the folder as is.
-6. Verify: open `…/host.html`, the home banner should **not** say "Demo mode". Present the sample set and join from a phone with the QR code.
+6. Supabase only, recommended: keep the project from pausing. In Supabase **SQL Editor**, run the two SQL lines from the top of `.github/workflows/keep-awake.yml` (a read-only function that returns the time). Then on GitHub: **Actions** tab → **Enable workflows** (forks have scheduled jobs off) → **Keep Supabase awake** → **Run workflow**, and check it goes green.
+7. Verify: open `…/host.html`, the home banner should **not** say "Demo mode". Present the sample set and join from a phone with the QR code.
 
 Local preview (optional, demo mode only unless config.js is filled in): `python3 -m http.server 8000` in the folder, then open `http://localhost:8000/host.html`. Opening files by double-clicking won't work.
 

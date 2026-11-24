@@ -13,7 +13,7 @@
   var code = PC.normCode(params.get("r")), fp = params.get("f") || null;
   var srv = PC.server.unpack(params.get("s"), params.get("k")) || (params.get("demo") ? { mode: "demo" } : (PC.server.site() || { mode: "demo" }));
 
-  var conn = null, state = null, lastSeq = 0, gotAt = 0, status = "connecting";
+  var conn = null, state = null, lastSeq = 0, gotAt = 0, status = "connecting", startedAt = Date.now(), failSince = 0, roomFull = false;
   var room = null; // saved per room: { b: {k,v,l}, nick, ans: {}, words: {}, asked: {}, ups: {}, rank: {} }
   var screen = "code", picking = null, drafts = {}, sending = {}, lastHi = 0;
 
@@ -49,10 +49,11 @@
     conn = PC.connect(srv);
     conn.join(code, "student", {
       onState: onState,
-      onStatus: function (st) {
+      onStatus: function (st, detail) {
         var was = status; status = st;
-        if (st === "SUBSCRIBED") { send({ t: "sync" }); if (room.b) sayHi(); }
-        if (was !== st) paintStatus();
+        if (st === "SUBSCRIBED") { failSince = 0; roomFull = false; send({ t: "sync" }); if (room.b) sayHi(); }
+        else if (/ERROR|TIMED|CLOSED/.test(st)) { if (!failSince) failSince = Date.now(); if (PC.isFull(detail)) roomFull = true; }
+        if (was !== st) { paintStatus(); if (!state && screen !== "pick") render(); }
       }
     });
     render();
@@ -62,6 +63,7 @@
       else if (room.b && state && !state.ended) send({ t: "ping" });
     }, 25000);
     setTimeout(function () { if (!state) { paintStatus(); render(); } }, 8000);
+    setInterval(function () { if (!state && screen !== "pick" && screen !== "code") render(); }, 5000);
     setInterval(tickTimer, 250);
     document.addEventListener("visibilitychange", function () { if (!document.hidden && conn) { send({ t: "sync" }); if (room.b) send({ t: "ping" }); } });
   }
@@ -107,6 +109,8 @@
     else if (state && state.kicked && state.kicked.indexOf(me) >= 0) h = header() + waitCard("You’ve left this room", "The presenter removed this phone from the room.", false);
     else if (state && state.ended) h = header() + waitCard("Thanks for coming in from the cold!", "This session has ended. You can close this page.", true);
     else if (screen === "pick") h = pickScreen();
+    else if (!state && roomFull) h = header() + waitCard("This room is full", (srv.own ? "This presenter’s connection handles about " + PC.capacity(srv) + " people at once, and it’s full right now." : "Poller Crowd’s free shared connection handles about " + PC.capacity(srv) + " people at once, counting everyone using it right now, and it’s full.") + " Let the presenter know. This page keeps trying, so you’ll get in as soon as a spot opens.", true);
+    else if (!state && status !== "SUBSCRIBED" && ((failSince && Date.now() - failSince > 8000) || Date.now() - startedAt > 20000)) h = header() + waitCard("Can’t connect yet", "This page keeps trying on its own. If it doesn’t connect soon: check you’re online (some school and event Wi-Fi blocks live connections, so try mobile data), or the connection may be full. Let the presenter know.", true);
     else if (!state) h = header() + waitCard("Finding the igloo…", status === "SUBSCRIBED" ? "Waiting for the presenter’s screen. Make sure the room is open on the projector." : "Connecting to the room…", true) + (Date.now() - gotAt > 8000 ? '<p class="note" style="text-align:center">Still waiting? Double-check the room code, or scan the QR code again.</p>' : "");
     else if (state.locked && !state.roster[me]) h = header() + waitCard("This room is locked", "The presenter has closed the doors for now. Ask them to unlock it.", false);
     else if (state.podium) h = header() + podiumScreen();

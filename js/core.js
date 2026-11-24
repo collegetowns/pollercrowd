@@ -196,6 +196,12 @@
     }
     return clients[k];
   }
+  // Did the server refuse us because it's at its limit of people at once?
+  PC.isFull = function (d) {
+    var m = ""; try { m = typeof d === "string" ? d : (d && (d.message || d.reason || d.code)) || JSON.stringify(d || ""); } catch (e) {}
+    return /too.?many|capacity|quota|limit|max(imum)?.?(connections|users|clients)/i.test(String(m));
+  };
+  PC.capacity = function (srv) { return srv && srv.mode === "firebase" ? 100 : 200; };
   PC.connect = function (srv) {
     return srv.mode === "supabase" ? supabaseConn(srv) : srv.mode === "firebase" ? firebaseConn(srv) : demoConn();
   };

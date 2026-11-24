@@ -1,0 +1,65 @@
+# Keeps the shared Supabase project from being paused for inactivity.
+#
+# Supabase pauses Free projects that show too little *database* activity over
+# a week. Poller Crowd only uses Realtime messages, so classes alone may not
+# count. Once a day this job runs one tiny read-only database query.
+#
+# One-time setup: in the Supabase dashboard, open SQL Editor, paste this, Run:
+#
+#   create or replace function public.keep_awake() returns timestamptz
+#     language sql stable as $$ select now() $$;
+#   grant execute on function public.keep_awake() to anon;
+#
+# It only returns the current time. Nothing is stored, and no data is exposed.
+# The project URL and publishable key are read from js/config.js.
+# If the project is paused or unreachable, this job fails and GitHub emails you.
+
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: "17 14 * * *"   # daily at 14:17 UTC
+  workflow_dispatch:        # "Run workflow" button on the Actions tab
+
+permissions:
+  contents: read
+  actions: write            # lets the job keep its own schedule switched on
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: js/config.js
+          sparse-checkout-cone-mode: false
+
+      - name: Ping the database
+        run: |
+          URL=$(sed -nE 's/^[[:space:]]*supabaseUrl:[[:space:]]*"([^"]*)".*/\1/p' js/config.js | head -1)
+          KEY=$(sed -nE 's/^[[:space:]]*supabaseKey:[[:space:]]*"([^"]*)".*/\1/p' js/config.js | head -1)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "No Supabase project in js/config.js, so there's nothing to keep awake."
+            exit 0
+          fi
+          URL="${URL%/}"
+          code=$(curl -sS -o reply.txt -w '%{http_code}' --max-time 60 -X POST "$URL/rest/v1/rpc/keep_awake" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{}' || echo 000)
+          echo "Database reply ($code): $(head -c 200 reply.txt 2>/dev/null)"
+          # A light request to the Realtime/Auth side too (harmless if it fails)
+          curl -sS -o /dev/null --max-time 30 "$URL/auth/v1/health" -H "apikey: $KEY" || true
+          if [ "$code" = "200" ]; then echo "Supabase is awake."; exit 0; fi
+          if [ "$code" = "404" ]; then
+            echo "::error::The keep_awake function isn't set up yet. In Supabase, open SQL Editor and run the two lines at the top of .github/workflows/keep-awake.yml."
+          else
+            echo "::error::Supabase didn't answer normally (HTTP $code). The project may be paused: open the Supabase dashboard and press Restore."
+          fi
+          exit 1
+
+      - name: Keep this schedule switched on
+        # GitHub turns off scheduled jobs in public repos after 60 days with no commits.
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keep-awake.yml/enable" || true

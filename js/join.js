@@ -6,10 +6,15 @@
   var LETTERS = "ABCDEFGH";
   var LOOKS = [["none", "None"], ["beanie", "Beanie"], ["sunglasses", "Shades"], ["glasses", "Glasses"], ["beard", "Beard"]];
 
-  // This phone's private id (never shown to anyone). The teacher only sees a one-way hash of it.
-  var dev = PC.store.get("dev"); if (!dev) { dev = PC.uid(18); PC.store.set("dev", dev); }
-  var me = null; // public id
   var params = new URLSearchParams(location.search);
+  // This phone's private id (never shown to anyone). The teacher only sees a one-way hash of it.
+  // Demo mode runs every "phone" in one browser, so each tab (or ?as=N preview phone) gets its own id there.
+  var demoTab = !!params.get("demo"), dev = null;
+  if (demoTab) {
+    if (/^[a-z0-9]{1,8}$/i.test(params.get("as") || "")) dev = "demo-phone-" + params.get("as") + "-0000";
+    else { try { dev = sessionStorage.getItem("pc.demoDev"); if (!dev) { dev = PC.uid(18); sessionStorage.setItem("pc.demoDev", dev); } } catch (e) { dev = PC.uid(18); } }
+  } else { dev = PC.store.get("dev"); if (!dev) { dev = PC.uid(18); PC.store.set("dev", dev); } }
+  var me = null; // public id
   var code = PC.normCode(params.get("r")), fp = params.get("f") || null;
   var srv = PC.server.unpack(params.get("s"), params.get("k")) || (params.get("demo") ? { mode: "demo" } : (PC.server.site() || { mode: "demo" }));
 
@@ -17,8 +22,9 @@
   var room = null; // saved per room: { b: {k,v,l}, nick, ans: {}, words: {}, asked: {}, ups: {}, rank: {} }
   var screen = "code", picking = null, drafts = {}, sending = {}, lastHi = 0;
 
-  function loadRoom() { room = PC.store.get("room." + code, null) || { b: null, nick: "", ans: {}, words: {}, asked: {}, ups: {}, rank: {} }; }
-  function saveRoom() { PC.store.set("room." + code, room); }
+  function roomKey() { return "room." + code + (demoTab ? "." + dev.slice(0, 16) : ""); }
+  function loadRoom() { room = PC.store.get(roomKey(), null) || { b: null, nick: "", ans: {}, words: {}, asked: {}, ups: {}, rank: {} }; }
+  function saveRoom() { PC.store.set(roomKey(), room); }
   // forget rooms from more than a week ago
   PC.store.keys("room.").forEach(function (k) { var r = PC.store.get(k); if (r && r.at && Date.now() - r.at > 7 * 864e5) PC.store.del(k); });
 
@@ -166,7 +172,7 @@
         var n = count[kk] || 0, fv2 = freePattern(kk, "none", taken);
         return '<button type="button" class="tile" role="radio" aria-checked="' + (kk === k) + '" aria-label="' + B.NAMES[kk] + (n ? ", " + n + " picked" : "") + '" data-kind="' + kk + '">' + B.svg(kk, kk === k ? v : (fv2 < 0 ? 0 : fv2), kk === k ? l : "none", 46, B.NAMES[kk]) + (n ? '<span class="count">' + n + "</span>" : "") + "</button>";
       }).join("") + "</div>" +
-      '<label class="field"><span>Nickname <span class="muted">(optional, only shows on quiz leaderboards; pick a fun one, not your real name)</span></span><input id="nickIn" class="input" maxlength="16" autocomplete="off" placeholder="Stay anonymous" value="' + esc(drafts.nick != null ? drafts.nick : room.nick || "") + '"></label>' +
+      '<label class="field"><span>Nickname <span class="muted">(optional, shows on quiz leaderboards and Slopes maps; pick a fun one, not your real name)</span></span><input id="nickIn" class="input" maxlength="16" autocomplete="off" placeholder="Stay anonymous" value="' + esc(drafts.nick != null ? drafts.nick : room.nick || "") + '"></label>' +
       '<button type="button" class="btn primary big block" data-act="enter">' + (room.b ? "Save my buddy" : "Into the igloo →") + "</button>";
   }
 

@@ -31,7 +31,7 @@
     if (type === "qa") { q.moderate = false; }
     if (type === "rs") { q.scaleMax = 5; q.lowLabel = "Not at all"; q.highLabel = "Very much"; }
     if (type === "th") { q.lowLabel = ""; q.highLabel = ""; }
-    if (type === "sp") { q.prompt = ""; q.lowLabel = ""; q.highLabel = ""; q.levels = ["", "", ""]; q.items = []; q.shuffle = true; }
+    if (type === "sp") { q.prompt = ""; q.lowLabel = ""; q.highLabel = ""; q.levels = ["", "", ""]; q.items = []; q.shuffle = true; q.upNext = 3; }
     if (type === "sl") { q.body = ""; q.timer = 0; }
     return q;
   }

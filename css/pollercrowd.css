@@ -310,6 +310,18 @@ legend { padding: 0; margin-bottom: 8px; font-weight: 800; }
 
 /* ---------- Slopes ---------- */
 .sp-lv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.sp-opt > span { opacity: .75; }
+.sp-opt > span i { font-style: normal; font-weight: 600; }
+.sp-opt .input { border-style: dashed; background: transparent; }
+.sp-switch { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+.sp-switch > input { position: absolute; opacity: 0; pointer-events: none; }
+.sp-switch .seg { align-self: flex-start; background: var(--panel2); }
+.sp-switch .seg label { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: 10px; color: var(--muted); font: 700 14px var(--body); cursor: pointer; }
+.sp-switch > input:nth-of-type(1):checked ~ .seg label:nth-of-type(1), .sp-switch > input:nth-of-type(2):checked ~ .seg label:nth-of-type(2) { background: var(--inv-bg); color: var(--inv-ink); }
+.sp-switch > input:focus-visible ~ .seg { outline: 3px solid var(--warm); outline-offset: 2px; }
+.sp-switch .sp-v svg { display: block; width: 100%; max-width: 900px; height: auto; }
+.sp-switch .sp-vb, .sp-switch > input:nth-of-type(2):checked ~ .sp-va { display: none; }
+.sp-switch > input:nth-of-type(2):checked ~ .sp-vb { display: block; }
 @media (max-width: 640px) { .sp-lv { grid-template-columns: 1fr; } }
 .sp-lift { display: flex; flex-direction: column; gap: 10px; }
 .sp-chip { align-self: flex-start; background: var(--warm); color: var(--warm-ink); font-weight: 800; }

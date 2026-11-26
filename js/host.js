@@ -273,12 +273,14 @@
       var lv = q.levels || ["", "", ""];
       h += '<label class="field"><span>⟵ Left end</span><input class="input" data-f="lowLabel" value="' + esc(q.lowLabel || "") + '" maxlength="30" placeholder="e.g. Precision"></label>' +
         '<label class="field"><span>Right end ⟶</span><input class="input" data-f="highLabel" value="' + esc(q.highLabel || "") + '" maxlength="30" placeholder="e.g. Flexibility"></label>' +
-        '<fieldset style="grid-column:1/-1;border:0;padding:0;margin:0"><legend style="font-weight:700;font-size:14px;color:var(--muted);margin-bottom:6px;padding:0">Levels, top to bottom <span class="muted" style="font-weight:600">· two or three, like trail signs</span></legend><div class="sp-lv">' +
-        [["◆ Top", "e.g. Federal"], ["■ Middle (optional)", "e.g. State"], ["● Bottom", "e.g. Local"]].map(function (x, i) {
-          return '<label class="field"><span>' + x[0] + '</span><input class="input" data-lvl="' + i + '" value="' + esc(lv[i] || "") + '" maxlength="18" placeholder="' + x[1] + '"></label>';
+        '<fieldset style="grid-column:1/-1;border:0;padding:0;margin:0"><legend style="font-weight:700;font-size:14px;color:var(--muted);margin-bottom:6px;padding:0">Levels, top to bottom <span class="muted" style="font-weight:600">· like trail signs</span></legend>' +
+        '<div class="sp-lv">' +
+        [["◆ Top", "e.g. Federal"], ["■ Middle <i>(optional)</i>", "Leave blank for two levels"], ["● Bottom", "e.g. Local"]].map(function (x, i) {
+          return '<label class="field' + (i === 1 ? " sp-opt" : "") + '"><span>' + x[0] + '</span><input class="input" data-lvl="' + i + '" value="' + esc(lv[i] || "") + '" maxlength="18" placeholder="' + x[1] + '"></label>';
         }).join("") + "</div></fieldset>" +
-        '<label class="field" style="grid-column:1/-1"><span>Cases to place, one per line <span class="muted" style="font-weight:600">· ' + window.PCSlopes.items(q).length + ' so far · add a short map label after a bar, like “Building zoning codes | Zoning codes”</span></span><textarea class="input" data-f="itemsText" rows="9" spellcheck="true">' + esc((q.items || []).join("\n")) + "</textarea></label>" +
-        '<label class="check" style="grid-column:1/-1"><input type="checkbox" data-f="shuffle"' + (q.shuffle !== false ? " checked" : "") + "> Shuffle the order (the big screen still shows the next three, so you can pick or skip)</label>" +
+        '<label class="field" style="grid-column:1/-1"><span>Cases to place: paste or type your list, one per line <span class="muted" style="font-weight:600">· ' + window.PCSlopes.items(q).length + ' so far · optional short map label after a bar, like “Building zoning codes | Zoning codes”</span></span><textarea class="input" data-f="itemsText" rows="9" spellcheck="true" placeholder="Highway speeds\nVoting age\nTeacher licensure\n…">' + esc((q.items || []).join("\n")) + "</textarea></label>" +
+        '<label class="field"><span>Choices that pop up on the big screen</span>' + sel("upNext", [[0, "None: just go in order"], [1, "1 case to choose from"], [2, "2 cases to choose from"], [3, "3 cases to choose from"], [4, "4 cases to choose from"], [5, "5 cases to choose from"]], window.PCSlopes.upNext(q)) + "</label>" +
+        '<label class="check" style="align-self:end"><input type="checkbox" data-f="shuffle"' + (q.shuffle !== false ? " checked" : "") + "> Shuffle the order</label>" +
         '<p class="note" style="grid-column:1/-1">Cases come up one at a time. People tap the map on their phones and lock in; spots stay hidden until you reveal the crowd average. The map fills up case by case until you hit the lodge.</p>';
     }
     if (q.type === "sl") h += '<label class="field"><span>Countdown</span>' + sel("timer", TIMERS_SL, q.timer || 0) + '</label><p class="note" style="align-self:end">Nothing to answer here. Use it for a welcome screen, instructions or a break. Phones show the title and point people to the big screen.</p>';
@@ -300,7 +302,7 @@
     else if (t.hasAttribute("data-lvl")) { if (!q.levels) q.levels = ["", "", ""]; q.levels[+t.getAttribute("data-lvl")] = t.value; }
     else if (f === "itemsText") { q.items = t.value.split("\n"); var cnt = t.closest(".field").querySelector("span .muted"); if (cnt) cnt.textContent = cnt.textContent.replace(/^· \d+ so far/, "· " + window.PCSlopes.items(q).length + " so far"); }
     else if (f === "multi" || f === "moderate" || f === "shuffle") q[f] = t.checked;
-    else if (f === "timer" || f === "maxWords" || f === "scaleMax") { q[f] = +t.value; if (f === "scaleMax") renderQEdit(); }
+    else if (f === "timer" || f === "maxWords" || f === "scaleMax" || f === "upNext") { q[f] = +t.value; if (f === "scaleMax") renderQEdit(); }
     else if (f) q[f] = t.value;
     saveDeckSoon(); refreshList();
     if (e.type === "change" && (t.hasAttribute("data-correct"))) renderQEdit();
@@ -427,7 +429,7 @@
         c.options = keep;
         if (c.type === "mc" || c.type === "qz") c.correct = R.corrects(c).map(function (i) { return map[i]; }).filter(function (i) { return i != null; });
       }
-      if (c.type === "sp") { c.items = window.PCSlopes.cleanLines(c); c.levels = window.PCSlopes.levels(c); }
+      if (c.type === "sp") { c.items = window.PCSlopes.cleanLines(c); c.levels = window.PCSlopes.levels(c); c.upNext = window.PCSlopes.upNext(c); }
       c.prompt = String(c.prompt).trim();
       return c;
     });
@@ -774,10 +776,10 @@
       list = list.filter(function (x) { return x.id === focus; }); opts.hl = null;
       note = list.length ? "Showing case " + list[0].n + " · pick another in the trail log" : "Nothing revealed yet";
     } else if (revealed && sp.hl == null) opts.show = idx;
-    var up = lodge ? [] : sp.order.slice(sp.pos + 1, sp.pos + 4), canPick = revealed;
+    var nUp = SP.upNext(q), up = lodge || !nUp ? [] : sp.order.slice(sp.pos + 1, sp.pos + 1 + nUp), canPick = revealed;
     var h = '<div class="sp-board"><div class="sp-mapcol"><div class="sp-bar"><div class="seg" role="group" aria-label="Map view"><button type="button" data-act="sp-view" data-v="avg" aria-pressed="' + (sp.view !== "orig") + '">Crowd average</button><button type="button" data-act="sp-view" data-v="orig" aria-pressed="' + (sp.view === "orig") + '">Individual Run</button></div><span class="note">' + esc(note) + "</span></div>" + SP.svg(q, list, opts) + "</div>";
     h += '<div class="sp-side">';
-    if (!lodge) {
+    if (!lodge && nUp) {
       h += '<span class="label">Up next</span>' + (up.length ? up.map(function (id, k) {
         return '<div class="sp-card"><button type="button" class="sp-pick" data-act="sp-pick" data-i="' + k + '"' + (canPick ? "" : " disabled") + ">" + esc(its[id].title) + "<small>" + (canPick ? "Ride this one next →" : "On deck") + '</small></button><button type="button" class="sp-skip" data-act="sp-skip" data-i="' + k + '" aria-label="Skip ' + esc(its[id].short) + '">Skip ✕</button></div>';
       }).join("") : '<p class="note">That’s every case. Next stop: the lodge!</p>') + (up.length && !canPick ? '<p class="note">Reveal this case, then pick one to ride next.</p>' : "");
@@ -1133,7 +1135,7 @@
         var ksp = curSt().sp, kat = ksp.pos + 1 + (+b.getAttribute("data-i"));
         if (kat < ksp.order.length) {
           var kid = ksp.order.splice(kat, 1)[0];
-          if (ksp.order.length - (ksp.pos + 1) >= 3) { ksp.order.push(kid); PC.toast("Skipped: sent to the bottom of the pile."); } else PC.toast("Skipped.");
+          if (ksp.order.length - (ksp.pos + 1) >= SP.upNext(curQ())) { ksp.order.push(kid); PC.toast("Skipped: sent to the bottom of the pile."); } else PC.toast("Skipped.");
           saveSoon(); renderResultsArea();
         } break;
       case "sp-skipcur":

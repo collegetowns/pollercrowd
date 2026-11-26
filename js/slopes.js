@@ -31,7 +31,9 @@
     }).filter(Boolean);
   }
   function cleanLines(q) { return (q.items || []).map(function (l) { return String(l || "").trim(); }).filter(function (l) { return l && l.split("|")[0].trim(); }); }
-  function levels(q) { return (q.levels || []).map(function (l) { return String(l || "").trim(); }).filter(Boolean).slice(0, 3); }
+  // Top, optional middle, bottom. A blank middle just means two levels.
+  function levels(q) { return (q.levels || []).slice(0, 3).map(function (l) { return String(l || "").trim(); }).filter(Boolean); }
+  function upNext(q) { var n = parseInt(q.upNext, 10); return isNaN(n) ? 3 : PC.clamp(n, 0, 5); }
   function levelOf(q, y) { var L = levels(q); if (!L.length) return ""; return L[Math.min(L.length - 1, Math.floor(y * L.length))]; }
   function leanOf(q, x) {
     var lo = q.lowLabel || "the left", hi = q.highLabel || "the right";
@@ -54,7 +56,8 @@
       Object.keys(A).forEach(function (pub) {
         var a = A[pub] && A[pub][idx]; if (!a) return;
         var r = (session.roster || {})[pub] || {};
-        marks.push({ x: a[0] / 1000, y: a[1] / 1000, k: r.k, v: r.v, l: r.l, pub: pub }); people[pub] = 1;
+        var B = window.PCBuddies, who = r.nick || (B && r.k ? B.describe(r.k, r.v) : "");
+        marks.push({ x: a[0] / 1000, y: a[1] / 1000, k: r.k, v: r.v, l: r.l, pub: pub, name: who }); people[pub] = 1;
       });
       if (!marks.length) return null;
       var a = { x: 0, y: 0 }; marks.forEach(function (m) { a.x += m.x; a.y += m.y; }); a.x /= marks.length; a.y /= marks.length;
@@ -109,36 +112,95 @@
     return s;
   }
   function overlap(a, b) { var x = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), y = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)); return x * y; }
-  function layoutTags(list) {
-    var placed = [], pts = list.map(function (it) { return { x: PX(it.x), y: PY(it.y) }; });
-    return list.map(function (it, i) {
-      var X = pts[i].x, Y = pts[i].y, w = Math.round(66 + it.label.length * 12.2), h = 46;
-      var c = [[16, -h - 12], [16, 12], [-w - 16, -h - 12], [-w - 16, 12], [-w / 2, -h - 24], [-w / 2, 22], [26, -h / 2], [-w - 26, -h / 2], [34, -h - 40], [-w - 34, -h - 40], [34, 40], [-w - 34, 40]];
-      var best = null, bs = 1e12;
-      c.forEach(function (d, k) {
-        var r = { x: X + d[0], y: Y + d[1], w: w, h: h }, sc = k * 2;
-        if (r.x < X0 + 4 || r.x + w > X1 - 4 || r.y < Y0 + 4 || r.y + h > Y1 - 4) sc += 1e5;
-        placed.forEach(function (q) { sc += overlap(r, q); });
-        pts.forEach(function (p) { if (p.x > r.x - 10 && p.x < r.x + w + 10 && p.y > r.y - 10 && p.y < r.y + h + 10) sc += 500; });
-        if (sc < bs) { bs = sc; best = r; }
-      });
-      placed.push(best);
-      return { it: it, X: X, Y: Y, r: best };
+  // Find a spot for a w×h label near (X, Y) that keeps clear of every box in `avoid` (buddies, pins, other labels).
+  // Tries close spots first, then farther ones joined by a short line. Returns null when nothing is clear and must is false.
+  function spotFor(X, Y, w, h, gap, avoid, must) {
+    var c = [], rings = [0, 34, 72, 116];
+    rings.forEach(function (d) {
+      var g = gap + d;
+      c.push([g, -h / 2], [-g - w, -h / 2], [-w / 2, g], [-w / 2, -g - h], [g * .75, g * .55], [g * .75, -g * .55 - h], [-g * .75 - w, g * .55], [-g * .75 - w, -g * .55 - h]);
     });
+    var best = null, bs = 1e15;
+    for (var k = 0; k < c.length; k++) {
+      var r = { x: X + c[k][0], y: Y + c[k][1], w: w, h: h }, sc = 0;
+      if (r.x < X0 + 4 || r.x + w > X1 - 4 || r.y < Y0 + 4 || r.y + h > Y1 - 4) continue;
+      for (var j = 0; j < avoid.length; j++) sc += overlap(r, avoid[j]);
+      if (sc === 0) return r;
+      sc = sc * 10 + k;
+      if (sc < bs) { bs = sc; best = r; }
+    }
+    return must ? best || { x: Math.max(X0 + 4, Math.min(X - w / 2, X1 - 4 - w)), y: Math.max(Y0 + 4, Y - h - gap), w: w, h: h } : null;
+  }
+  function boxAround(x, y, r) { return { x: x - r, y: y - r, w: r * 2, h: r * 2 }; }
+  function buddyBox(x, y, size) { return { x: x - size / 2, y: y - size / 2, w: size + 8, h: size + 8 }; }
+  function layoutTags(list, avoid) {
+    avoid = avoid.slice();
+    list.forEach(function (it) { avoid.push(boxAround(PX(it.x), PY(it.y), 12)); });
+    return list.map(function (it) {
+      var X = PX(it.x), Y = PY(it.y), w = Math.round(66 + it.label.length * 12.2), h = 46;
+      var r = spotFor(X, Y, w, h, 18, avoid, true);
+      avoid.push({ x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 });
+      return { it: it, X: X, Y: Y, r: r };
+    });
+  }
+  // Spread out buddies that land on top of each other (a small nudge only; the dashed line still runs to the average)
+  function nudge(pts, size) {
+    var min = size * .82, lim = size * .7;
+    for (var it = 0; it < 30; it++) {
+      var moved = false;
+      for (var i = 0; i < pts.length; i++) for (var j = i + 1; j < pts.length; j++) {
+        var a = pts[i], b = pts[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+        if (d >= min) continue;
+        if (d < .01) { dx = (j % 2 ? 1 : -1); dy = .3; d = Math.hypot(dx, dy); }
+        var push = (min - d) / 2 + .5, ux = dx / d, uy = dy / d;
+        a.x -= ux * push; a.y -= uy * push; b.x += ux * push; b.y += uy * push; moved = true;
+      }
+      pts.forEach(function (p) {
+        var ox = p.x - p.x0, oy = p.y - p.y0, o = Math.hypot(ox, oy);
+        if (o > lim) { p.x = p.x0 + ox / o * lim; p.y = p.y0 + oy / o * lim; }
+        p.x = Math.max(X0 + size / 2, Math.min(X1 - size / 2, p.x)); p.y = Math.max(Y0 + size / 2, Math.min(Y1 - size / 2, p.y));
+      });
+      if (!moved) break;
+    }
+    return pts;
   }
   function pin(x, y, n, C, r) { r = r || 18; return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" style="fill:' + C.warm + ";stroke:" + C.panel + ';stroke-width:3"/><text x="' + x + '" y="' + (y + r * 0.36) + '" text-anchor="middle" ' + text(C.warmInk, C.font, Math.round(r * 0.98), 700) + ">" + n + "</text>"; }
   function buddyAt(m, x, y, size) {
     var B = window.PCBuddies; if (!B) return "";
     return '<g transform="translate(' + (x - size / 2).toFixed(1) + " " + (y - size / 2).toFixed(1) + ')">' + B.svg(m.k, m.v, m.l, size) + "</g>";
   }
-  function marksFor(it, C, size, badge) {
-    var ax = PX(it.x), ay = PY(it.y), s = "";
-    it.marks.forEach(function (m) { s += '<line x1="' + PX(m.x) + '" y1="' + PY(m.y) + '" x2="' + ax + '" y2="' + ay + '" ' + stroke(C.glacier, 2, "5 5") + ' opacity=".8"/>'; });
-    it.marks.forEach(function (m) {
-      var x = PX(m.x), y = PY(m.y); s += buddyAt(m, x, y, size);
+  // Where each buddy is drawn for a set of items (nudged apart so none hides another)
+  function placeMarks(list, size) {
+    var pts = [];
+    list.forEach(function (it) { it.marks.forEach(function (m) { var x = PX(m.x), y = PY(m.y); pts.push({ it: it, m: m, x: x, y: y, x0: x, y0: y }); }); });
+    return nudge(pts, size);
+  }
+  function marksFor(it, pts, C, size, badge) {
+    var ax = PX(it.x), ay = PY(it.y), s = "", mine = pts.filter(function (p) { return p.it === it; });
+    mine.forEach(function (p) { s += '<line x1="' + p.x + '" y1="' + p.y + '" x2="' + ax + '" y2="' + ay + '" ' + stroke(C.glacier, 2, "5 5") + ' opacity=".8"/>'; });
+    mine.forEach(function (p) {
+      var x = p.x, y = p.y; s += buddyAt(p.m, x, y, size);
       if (badge) s += '<circle cx="' + (x + size * .36) + '" cy="' + (y + size * .34) + '" r="11" style="fill:' + C.panel + ";stroke:" + C.ink + ';stroke-width:2"/><text x="' + (x + size * .36) + '" y="' + (y + size * .34 + 4.5) + '" text-anchor="middle" ' + text(C.ink, C.font, 13, 700) + ">" + it.n + "</text>";
     });
     s += '<circle cx="' + ax + '" cy="' + ay + '" r="15" style="fill:' + C.panel + ";stroke:" + C.ink + ';stroke-width:2.5;stroke-dasharray:4 3"/><text x="' + ax + '" y="' + (ay + 5.5) + '" text-anchor="middle" ' + text(C.ink, C.font, 15, 700) + ">" + it.n + "</text>";
+    return s;
+  }
+  // Name tags beside each buddy, only where they fit without covering another buddy, an average or another name
+  function nameTags(pts, list, C, size, faded) {
+    var avoid = [], s = "", fs = size >= 44 ? 17 : 14, h = fs + 12;
+    pts.forEach(function (p) { avoid.push(buddyBox(p.x, p.y, size)); });
+    list.forEach(function (it) { avoid.push(boxAround(PX(it.x), PY(it.y), 17)); });
+    pts.forEach(function (p) {
+      var nm = String(p.m.name || "").trim(); if (!nm || (faded && faded(p.it))) return;
+      if (nm.length > 18) nm = nm.slice(0, 17) + "…";
+      var w = Math.round(nm.length * fs * .56 + 18), r = spotFor(p.x, p.y, w, h, size / 2 + 6, avoid, false);
+      if (!r) return;
+      avoid.push({ x: r.x - 3, y: r.y - 3, w: r.w + 6, h: r.h + 6 });
+      var lx = Math.max(r.x, Math.min(p.x, r.x + r.w)), ly = Math.max(r.y, Math.min(p.y, r.y + r.h)), far = Math.hypot(lx - p.x, ly - p.y) > size / 2 + 14;
+      s += '<g class="sp-name">' + (far ? '<line x1="' + p.x + '" y1="' + p.y + '" x2="' + lx + '" y2="' + ly + '" ' + stroke(C.muted, 1.5) + ' opacity=".7"/>' : "") +
+        '<rect x="' + r.x + '" y="' + r.y + '" width="' + r.w + '" height="' + r.h + '" rx="' + (h / 2) + '" style="fill:' + C.panel2 + ";stroke:" + C.border + ';stroke-width:1.5" opacity=".95"/>' +
+        '<text x="' + (r.x + r.w / 2) + '" y="' + (r.y + h / 2 + fs * .36) + '" text-anchor="middle" ' + text(C.ink, C.body, fs, 700) + ">" + esc(nm) + "</text></g>";
+    });
     return s;
   }
   /* o: { pal: "night" | "day" (fixed colors for pictures; omit for on-screen theme colors),
@@ -150,12 +212,20 @@
     var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + MW + " " + MH + '" ' + (o.attrs || "") + ' role="img" aria-label="' + esc("Map from " + (q.lowLabel || "") + " to " + (q.highLabel || "") + " across " + levels(q).join(", ")) + '">' + base(q, C, p);
     var total = 0; list.forEach(function (it) { total += it.marks.length; });
     if (o.mode === "orig") {
-      var size = total > 140 ? 30 : total > 70 ? 38 : 50;
-      list.forEach(function (it) { s += '<g opacity="' + (o.hl && o.hl !== it.id ? .12 : 1) + '">' + marksFor(it, C, size, true) + "</g>"; });
+      var size = total > 140 ? 30 : total > 70 ? 38 : 50, dim = function (it) { return o.hl != null && o.hl !== it.id; };
+      var pts = placeMarks(o.hl != null ? list.filter(function (it) { return it.id === o.hl; }) : list, size), all = o.hl != null ? placeMarks(list, size) : pts;
+      // spotlighted case: others fade, and only its people get names
+      list.forEach(function (it) { s += '<g opacity="' + (dim(it) ? .12 : 1) + '">' + marksFor(it, dim(it) ? all : pts, C, size, true) + "</g>"; });
+      s += nameTags(pts, list.filter(function (it) { return !dim(it); }), C, size);
     } else {
-      list.forEach(function (it) { if (o.show != null && o.show === it.id) s += '<g class="sp-pop">' + marksFor(it, C, it.marks.length > 25 ? 44 : 58, false) + "</g>"; });
+      var avoid = [], shown = list.filter(function (it) { return o.show != null && o.show === it.id; });
+      shown.forEach(function (it) {
+        var sz = it.marks.length > 25 ? 44 : 58, sp = placeMarks([it], sz);
+        sp.forEach(function (p) { avoid.push(buddyBox(p.x, p.y, sz)); });
+        s += '<g class="sp-pop">' + marksFor(it, sp, C, sz, false) + "</g>";
+      });
       if (o.pins || list.length > 12) list.forEach(function (it) { s += '<g opacity="' + (o.hl != null && o.hl !== it.id ? .2 : 1) + '"><title>' + esc(it.title) + "</title>" + pin(PX(it.x), PY(it.y), it.n, C) + "</g>"; });
-      else layoutTags(list).forEach(function (L) {
+      else layoutTags(list, avoid).forEach(function (L) {
         var r = L.r, it = L.it, cy = r.y + r.h / 2, lx = Math.max(r.x, Math.min(L.X, r.x + r.w)), ly = Math.max(r.y, Math.min(L.Y, r.y + r.h));
         s += '<g opacity="' + (o.hl != null && o.hl !== it.id ? .2 : 1) + '"' + (it.fresh ? ' class="sp-pop"' : "") + '><title>' + esc(it.title) + "</title>" +
           '<line x1="' + L.X + '" y1="' + L.Y + '" x2="' + lx + '" y2="' + ly + '" ' + stroke(C.glacier, 2) + "/>" +
@@ -205,7 +275,11 @@
     if (!r.items.length) return { html: '<div class="frozen"><h3>No cases were revealed</h3><p class="muted">Cases show up here once they’re revealed on the big screen.</p></div>', data: r };
     var h = '<div class="stat-row"><div class="stat"><span class="label">Cases on the map</span><b>' + r.items.length + '</b></div><div class="stat"><span class="label">Most debated</span><b style="font-size:20px">' + (r.debated ? r.debated.n + ". " + esc(r.debated.label) : "–") +
       '</b></div><div class="stat"><span class="label">Most agreed</span><b style="font-size:20px">' + (r.agreed ? r.agreed.n + ". " + esc(r.agreed.label) : "–") + "</b></div></div>";
-    h += '<div class="sp-maps"><figure class="sp-fig"><figcaption class="label">Crowd average</figcaption>' + svg(q, r.items, {}) + '</figure><figure class="sp-fig"><figcaption class="label">Individual Run</figcaption>' + svg(q, r.items, { mode: "orig" }) + "</figure></div>";
+    // Class / Individuals switch that works without scripts (results page and printed summary)
+    var g = "spv" + Math.random().toString(36).slice(2, 8);
+    h += '<div class="sp-switch"><input type="radio" name="' + g + '" id="' + g + 'a" checked><input type="radio" name="' + g + '" id="' + g + 'b">' +
+      '<div class="seg" role="group" aria-label="Map view"><label for="' + g + 'a">Class average</label><label for="' + g + 'b">Individuals</label></div>' +
+      '<div class="sp-v sp-va">' + svg(q, r.items, {}) + '</div><div class="sp-v sp-vb">' + svg(q, r.items, { mode: "orig" }) + "</div></div>";
     h += '<div class="sp-list">' + r.items.map(function (it) {
       return '<div class="sp-row"><span class="sp-n">' + it.n + '</span><span class="t">' + esc(it.title) + '</span><span class="muted">' + esc(levelOf(q, it.y)) + " · " + esc(leanOf(q, it.x)) + " · " + it.marks.length + (it.marks.length === 1 ? " answer" : " answers") + " · " + it.agree + "</span></div>";
     }).join("") + "</div>";
@@ -223,5 +297,5 @@
     });
   }
 
-  window.PCSlopes = { items: items, cleanLines: cleanLines, levels: levels, levelOf: levelOf, leanOf: leanOf, agreeLabel: agreeLabel, compute: compute, svg: svg, phoneSvg: phoneSvg, phoneSpot: phoneSpot, view: view, png: png };
+  window.PCSlopes = { upNext: upNext, items: items, cleanLines: cleanLines, levels: levels, levelOf: levelOf, leanOf: leanOf, agreeLabel: agreeLabel, compute: compute, svg: svg, phoneSvg: phoneSvg, phoneSpot: phoneSpot, view: view, png: png };
 })();

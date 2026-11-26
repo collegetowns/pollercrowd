@@ -97,6 +97,21 @@
     PC.store.set("sampleV3", true);
   }
   if (!PC.store.get("sampleRace")) { Store.saveDeck(sampleRace()); PC.store.set("sampleRace", true); }
+  function sampleSlopes() {
+    var policies = ["Curriculum in elementary and middle school | Elem. & middle curriculum", "Curriculum in high school | High school curriculum", "Curriculum in universities | University curriculum",
+      "How much teachers are paid | Teacher pay", "Discrimination/ protected classes (race, gender, etc.) | Protected classes", "Driver’s license rules", "Highway speeds", "Speeds on local streets | Local street speeds",
+      "Obscenity speech codes", "Building codes (such as fire safety and disability accommodations) | Building codes", "Building zoning codes | Zoning codes", "Workplace safety codes",
+      "International Diplomacy | International diplomacy", "Privacy laws", "Artificial Intelligence | Artificial intelligence", "Police conduct", "Rights for those arrested/ prisoners | Arrestee & prisoner rights",
+      "Immigration rules", "Income taxes", "Corporate taxes", "Health insurance regulations | Health insurance regs", "Car insurance regulations | Car insurance regs", "Border Control | Border control",
+      "Responses to homelessness | Homelessness responses", "Drug and alcohol regulations | Drug & alcohol regs", "Voter rights", "Voting age", "Election management", "Hair stylist licensure", "Teacher licensure", "Environmental protection"];
+    return {
+      id: PC.uid(8), title: "Sample: Policy Slopes", updated: Date.now() + 2, questions: [
+        Object.assign(R.blank("sl"), { prompt: "Welcome to Policy Slopes!", body: "Scan the code and pick your buddy.\nFor each policy: who usually sets it, and how much room does it leave?" }),
+        Object.assign(R.blank("sp"), { prompt: "Where does each policy sit?", lowLabel: "Precision", highLabel: "Flexibility", levels: ["Federal", "State", "Local"], items: policies, shuffle: true })
+      ]
+    };
+  }
+  if (!PC.store.get("sampleSlopes")) { Store.saveDeck(sampleSlopes()); PC.store.set("sampleSlopes", true); }
   // Give the sample set a photo so every feature is there to try
   if (!PC.store.get("samplePhoto")) {
     var sd = Store.decks().filter(function (d) { return d.title === "Sample: Earth Science 101"; })[0], sdeck = sd && Store.deck(sd.id);
@@ -254,6 +269,18 @@
     if (q.type === "rk") h += '<p class="note">People put the items in order on their phones. Results show the average place of each item.</p>';
     if (q.type === "th") h += '<label class="field"><span>❄ Cold pole <span class="muted">(left end)</span></span><input class="input" data-f="lowLabel" value="' + esc(q.lowLabel || "") + '" maxlength="40" placeholder="e.g. Totally disagree"></label><label class="field"><span>🔥 Hot pole <span class="muted">(right end)</span></span><input class="input" data-f="highLabel" value="' + esc(q.highLabel || "") + '" maxlength="40" placeholder="e.g. Totally agree"></label>' +
       '<p class="note" style="grid-column:1/-1">People slide a marker along a thermometer to show where they think it sits between the two poles. The big screen shows where the room landed and the crowd average.</p>';
+    if (q.type === "sp") {
+      var lv = q.levels || ["", "", ""];
+      h += '<label class="field"><span>⟵ Left end</span><input class="input" data-f="lowLabel" value="' + esc(q.lowLabel || "") + '" maxlength="30" placeholder="e.g. Precision"></label>' +
+        '<label class="field"><span>Right end ⟶</span><input class="input" data-f="highLabel" value="' + esc(q.highLabel || "") + '" maxlength="30" placeholder="e.g. Flexibility"></label>' +
+        '<fieldset style="grid-column:1/-1;border:0;padding:0;margin:0"><legend style="font-weight:700;font-size:14px;color:var(--muted);margin-bottom:6px;padding:0">Levels, top to bottom <span class="muted" style="font-weight:600">· two or three, like trail signs</span></legend><div class="sp-lv">' +
+        [["◆ Top", "e.g. Federal"], ["■ Middle (optional)", "e.g. State"], ["● Bottom", "e.g. Local"]].map(function (x, i) {
+          return '<label class="field"><span>' + x[0] + '</span><input class="input" data-lvl="' + i + '" value="' + esc(lv[i] || "") + '" maxlength="18" placeholder="' + x[1] + '"></label>';
+        }).join("") + "</div></fieldset>" +
+        '<label class="field" style="grid-column:1/-1"><span>Cases to place, one per line <span class="muted" style="font-weight:600">· ' + window.PCSlopes.items(q).length + ' so far · add a short map label after a bar, like “Building zoning codes | Zoning codes”</span></span><textarea class="input" data-f="itemsText" rows="9" spellcheck="true">' + esc((q.items || []).join("\n")) + "</textarea></label>" +
+        '<label class="check" style="grid-column:1/-1"><input type="checkbox" data-f="shuffle"' + (q.shuffle !== false ? " checked" : "") + "> Shuffle the order (the big screen still shows the next three, so you can pick or skip)</label>" +
+        '<p class="note" style="grid-column:1/-1">Cases come up one at a time. People tap the map on their phones and lock in; spots stay hidden until you reveal the crowd average. The map fills up case by case until you hit the lodge.</p>';
+    }
     if (q.type === "sl") h += '<label class="field"><span>Countdown</span>' + sel("timer", TIMERS_SL, q.timer || 0) + '</label><p class="note" style="align-self:end">Nothing to answer here. Use it for a welcome screen, instructions or a break. Phones show the title and point people to the big screen.</p>';
     h += "</div>";
     var p = R.problems(q);
@@ -270,7 +297,9 @@
       if (t.checked) cs.push(ci);
       q.correct = cs.sort(function (a, b) { return a - b; });
     }
-    else if (f === "multi" || f === "moderate") q[f] = t.checked;
+    else if (t.hasAttribute("data-lvl")) { if (!q.levels) q.levels = ["", "", ""]; q.levels[+t.getAttribute("data-lvl")] = t.value; }
+    else if (f === "itemsText") { q.items = t.value.split("\n"); var cnt = t.closest(".field").querySelector("span .muted"); if (cnt) cnt.textContent = cnt.textContent.replace(/^· \d+ so far/, "· " + window.PCSlopes.items(q).length + " so far"); }
+    else if (f === "multi" || f === "moderate" || f === "shuffle") q[f] = t.checked;
     else if (f === "timer" || f === "maxWords" || f === "scaleMax") { q[f] = +t.value; if (f === "scaleMax") renderQEdit(); }
     else if (f) q[f] = t.value;
     saveDeckSoon(); refreshList();
@@ -398,6 +427,7 @@
         c.options = keep;
         if (c.type === "mc" || c.type === "qz") c.correct = R.corrects(c).map(function (i) { return map[i]; }).filter(function (i) { return i != null; });
       }
+      if (c.type === "sp") { c.items = window.PCSlopes.cleanLines(c); c.levels = window.PCSlopes.levels(c); }
       c.prompt = String(c.prompt).trim();
       return c;
     });
@@ -446,6 +476,7 @@
     var q = curQ(), st = s.status[q.id];
     if (!st) {
       st = s.status[q.id] = { open: false, hideResults: !Store.settings().liveResults || q.type === "qz", revealed: false };
+      if (q.type === "sp") st.sp = spStart(q);
       if (!needsStart(q)) startVoting(st, q);
     }
     if (!initial) { sendState(true); saveSoon(); renderLive(); }
@@ -488,6 +519,11 @@
     if (q.type === "wc") d.q.maxWords = q.maxWords || 1;
     if (q.type === "rs") { d.q.scaleMax = q.scaleMax; d.q.lowLabel = q.lowLabel; d.q.highLabel = q.highLabel; }
     if (q.type === "th") { d.q.lowLabel = q.lowLabel; d.q.highLabel = q.highLabel; }
+    if (q.type === "sp" && st.sp) {
+      var sp = st.sp, idx = sp.order[sp.pos], spi = window.PCSlopes.items(q)[idx];
+      d.q.sp = { phase: sp.phase, low: q.lowLabel, high: q.highLabel, lv: q.levels };
+      if (spi && sp.phase !== "lodge") { d.q.sp.i = idx; d.q.sp.title = spi.title; d.q.sp.n = sp.phase === "place" ? sp.done.length + 1 : sp.done.indexOf(idx) + 1; }
+    }
     if (q.type === "sl") { d.q.body = q.body || ""; if (st.openedAt && !st.open && q.timer) d.q.done = 1; }
     if (q.timer) d.q.timer = q.timer;
     if (q.image) d.q.photo = 1;
@@ -595,6 +631,12 @@
       } else if (q.type === "th") {
         if (!Number.isInteger(val) || val < 0 || val > 100) return;
         A[pub] = val;
+      } else if (q.type === "sp") {
+        var sp = st.sp; if (!sp || sp.phase !== "place" || !val || typeof val !== "object") return;
+        var cur = sp.order[sp.pos];
+        if (val.i !== cur || !Number.isInteger(val.x) || !Number.isInteger(val.y) || val.x < 0 || val.x > 1000 || val.y < 0 || val.y > 1000) return;
+        var spots = A[pub] && typeof A[pub] === "object" && !Array.isArray(A[pub]) ? A[pub] : {};
+        spots[cur] = [val.x, val.y]; A[pub] = spots;
       } else if (q.type === "rk") {
         if (!Array.isArray(val) || val.length !== n) return;
         var seen = {}; for (var j = 0; j < n; j++) { if (!Number.isInteger(val[j]) || val[j] < 0 || val[j] >= n || seen[val[j]]) return; seen[val[j]] = 1; }
@@ -656,6 +698,7 @@
     var box = $("#qbox"); if (!box || !live) return;
     if (live.s.podium) { renderPodium(box); return; }
     if (live.s.mode === "self") { renderRace(box); return; }
+    if (curQ().type === "sp") { renderSlopesStage(box); return; }
     var s = live.s, q = curQ(), st = curSt(), T = R.TYPES[q.type];
     var ctrl = [];
     ctrl.push('<button type="button" class="btn" data-act="prev"' + (s.qi === 0 ? " disabled" : "") + '>← Back</button>');
@@ -677,6 +720,7 @@
   function renderResultsArea() {
     var el = $("#resultsArea"); if (!el || !live || live.s.podium || live.s.mode === "self") return;
     var s = live.s, q = curQ(), st = curSt();
+    if (q.type === "sp") { renderSlopesArea(el); return; }
     if (q.type === "sl") {
       el.innerHTML = '<div class="stack-16" style="gap:22px">' + R.view(s, q).html + (q.timer ? '<div class="big-timer" id="bigTimer"><span class="label">' + (st.openedAt ? (st.open ? "Back in" : "Time’s up!") : "Countdown") + "</span><b>" + fmtClock(st.open && st.endsAt ? st.endsAt - Date.now() : st.openedAt ? 0 : q.timer * 1000) + "</b></div>" : "") +
         (q.body || q.timer || q.image ? "" : '<p class="muted" style="font-size:20px">Phones are showing this title too. Press Next when you’re ready.</p>') + "</div>";
@@ -696,6 +740,66 @@
     var chip = $("#statusChip");
     if (chip) chip.innerHTML = '<span class="dot' + (st.open ? "" : " off") + '"></span>' + (st.open ? "Open" : st.revealed ? "Answer shown" : "Closed") + " · " + label + '<span id="timerTxt"></span>';
   }
+  /* ---------- Slopes on the big screen ---------- */
+  var SP = window.PCSlopes;
+  function spStart(q) {
+    var order = SP.items(q).map(function (_, i) { return i; });
+    if (q.shuffle !== false) for (var i = order.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = order[i]; order[i] = order[j]; order[j] = t; }
+    return { order: order, pos: 0, phase: "place", done: [], view: "avg", hl: null };
+  }
+  var LIFT = '<svg width="26" height="22" viewBox="0 0 26 22" aria-hidden="true"><path d="M0 2 L26 6" stroke="currentColor" stroke-width="2"/><path d="M13 4 V12 M6 12 H20 M6 12 V18 H20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function spLocked(sp, A) { var idx = sp.order[sp.pos], n = 0; Object.keys(A || {}).forEach(function (p) { if (A[p] && A[p][idx]) n++; }); return n; }
+  function renderSlopesStage(box) {
+    var s = live.s, q = curQ(), st = curSt(), sp = st.sp || (st.sp = spStart(q)), its = SP.items(q), idx = sp.order[sp.pos], it = its[idx];
+    var lodge = sp.phase === "lodge", placing = sp.phase === "place", n = placing ? sp.done.length + 1 : sp.done.indexOf(idx) + 1, last = s.qi === s.questions.length - 1;
+    var ctrl = ['<button type="button" class="btn" data-act="prev"' + (s.qi === 0 ? " disabled" : "") + ">← Back</button>"];
+    if (lodge) ctrl.push('<button type="button" class="btn" data-act="sp-ride">⛷ Keep riding</button>');
+    else if (placing) ctrl.push('<button type="button" class="btn primary" data-act="sp-reveal">Reveal the crowd average</button>', '<button type="button" class="btn" data-act="sp-skipcur">Skip this case</button>');
+    else ctrl.push('<button type="button" class="btn primary" data-act="sp-next">' + (sp.pos >= sp.order.length - 1 ? "To the lodge →" : "Next case →") + "</button>");
+    if (!lodge) ctrl.push('<button type="button" class="btn" data-act="sp-lodge"' + (sp.done.length ? "" : " disabled") + '>🏔 Hit the Lodge</button>');
+    ctrl.push('<button type="button" class="btn' + (lodge ? " primary" : "") + '" data-act="next">' + (last ? (hasQuiz(s) && !s.podiumShown ? "Show the podium →" : "Finish") : "Next question →") + "</button>");
+    var head = lodge ? '<div class="sp-lift"><span class="chip sp-chip">' + LIFT + 'At the lodge</span><h1 class="q-title">' + esc(q.prompt) + '</h1><p class="sp-prompt muted">' + sp.done.length + (sp.done.length === 1 ? " case" : " cases") + " on the map</p></div>"
+      : '<div class="sp-lift"><span class="chip sp-chip">' + LIFT + "On the lift · Case " + n + '</span><h1 class="q-title">' + esc(it ? it.title : "") + '</h1><p class="sp-prompt muted">' + esc(q.prompt) + "</p></div>";
+    box.innerHTML = '<div style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center"><span class="label">Question ' + (s.qi + 1) + " of " + s.questions.length + ' · Slopes</span><span class="chip" id="statusChip"></span></div>' + head + "</div>" +
+      '<div id="resultsArea" aria-live="polite"></div><div class="controls" id="ctrl">' + ctrl.join("") + "</div>" +
+      '<div class="crowd-row"><span class="label" id="crowdLabel">In the igloo · 0</span><div class="crowd" id="crowd"></div></div>';
+    renderResultsArea();
+  }
+  function renderSlopesArea(el) {
+    var s = live.s, q = curQ(), st = curSt(), sp = st.sp, its = SP.items(q), idx = sp.order[sp.pos];
+    var r = SP.compute(s, q), list = r.items, lodge = sp.phase === "lodge", placing = sp.phase === "place", revealed = sp.phase === "revealed";
+    var opts = { mode: sp.view, hl: sp.hl, id: "live" }, note = "";
+    if (sp.view === "orig") {
+      var focus = sp.hl != null ? sp.hl : revealed ? idx : list.length ? list[list.length - 1].id : null;
+      list = list.filter(function (x) { return x.id === focus; }); opts.hl = null;
+      note = list.length ? "Showing case " + list[0].n + " · pick another in the trail log" : "Nothing revealed yet";
+    } else if (revealed && sp.hl == null) opts.show = idx;
+    var up = lodge ? [] : sp.order.slice(sp.pos + 1, sp.pos + 4), canPick = revealed;
+    var h = '<div class="sp-board"><div class="sp-mapcol"><div class="sp-bar"><div class="seg" role="group" aria-label="Map view"><button type="button" data-act="sp-view" data-v="avg" aria-pressed="' + (sp.view !== "orig") + '">Crowd average</button><button type="button" data-act="sp-view" data-v="orig" aria-pressed="' + (sp.view === "orig") + '">Individual Run</button></div><span class="note">' + esc(note) + "</span></div>" + SP.svg(q, list, opts) + "</div>";
+    h += '<div class="sp-side">';
+    if (!lodge) {
+      h += '<span class="label">Up next</span>' + (up.length ? up.map(function (id, k) {
+        return '<div class="sp-card"><button type="button" class="sp-pick" data-act="sp-pick" data-i="' + k + '"' + (canPick ? "" : " disabled") + ">" + esc(its[id].title) + "<small>" + (canPick ? "Ride this one next →" : "On deck") + '</small></button><button type="button" class="sp-skip" data-act="sp-skip" data-i="' + k + '" aria-label="Skip ' + esc(its[id].short) + '">Skip ✕</button></div>';
+      }).join("") : '<p class="note">That’s every case. Next stop: the lodge!</p>') + (up.length && !canPick ? '<p class="note">Reveal this case, then pick one to ride next.</p>' : "");
+    }
+    h += '<span class="label" style="margin-top:6px">Trail log</span><div class="sp-log">' + (r.items.length ? r.items.map(function (x) {
+      return '<button type="button" data-act="sp-hl" data-i="' + x.id + '" aria-pressed="' + (sp.hl === x.id) + '"><span class="sp-n">' + x.n + '</span><span style="flex:1">' + esc(x.label) + '</span><small class="muted">' + esc(SP.levelOf(q, x.y)) + "</small></button>";
+    }).join("") : '<p class="note">Revealed cases show up here. Click one to spotlight it.</p>') + "</div></div></div>";
+    el.innerHTML = h;
+    var chip = $("#statusChip"), A = s.answers[q.id] || {};
+    if (chip) {
+      var k = spLocked(sp, A), here = present().length;
+      chip.innerHTML = '<span class="dot' + (placing && st.open ? "" : " off") + '"></span>' + (lodge ? "At the lodge · " + r.items.length + " cases" : placing ? k + " of " + here + " locked in" : "Revealed · " + k + (k === 1 ? " spot" : " spots"));
+    }
+  }
+  function spNext() {
+    var st = curSt(), sp = st.sp, q = curQ();
+    if (sp.pos >= sp.order.length - 1) { spLodge(); return; }
+    sp.pos++; sp.phase = "place"; sp.hl = null; startVoting(st, q);
+    sendState(true); saveSoon(); renderStage();
+  }
+  function spLodge() { var st = curSt(), sp = st.sp; sp.prev = sp.phase; sp.phase = "lodge"; sp.hl = null; st.open = false; st.endsAt = null; sendState(true); saveSoon(); renderStage(); }
+
   // The answer choices, big, for the projector (no vote counts)
   function optionCards(q) {
     return '<div class="optgrid">' + q.options.map(function (o, i) { return '<div class="optcard"><span class="letter">' + R.LETTERS[i] + "</span><span>" + esc(o) + "</span></div>"; }).join("") + "</div>";
@@ -1015,6 +1119,38 @@
       case "start": startVoting(curSt(), curQ()); sendState(true); saveSoon(); renderStage(); break;
       case "toggle-open": var so = curSt(); if (so.open) { so.open = false; so.endsAt = null; } else startVoting(so, curQ()); sendState(true); saveSoon(); renderStage(); break;
       case "toggle-results": curSt().hideResults = !curSt().hideResults; saveSoon(); renderStage(); break;
+      case "sp-view": curSt().sp.view = b.getAttribute("data-v"); saveSoon(); renderResultsArea(); break;
+      case "sp-hl": var hsp = curSt().sp, hi = +b.getAttribute("data-i"); hsp.hl = hsp.hl === hi ? null : hi; saveSoon(); renderResultsArea(); break;
+      case "sp-reveal":
+        var rst = curSt(), rsp = rst.sp, ridx = rsp.order[rsp.pos];
+        rsp.phase = "revealed"; rsp.hl = null; rst.open = false; rst.endsAt = null; if (rsp.done.indexOf(ridx) < 0) rsp.done.push(ridx);
+        sendState(true); saveSoon(); renderStage(); break;
+      case "sp-next": spNext(); break;
+      case "sp-pick":
+        var psp = curSt().sp, pat = psp.pos + 1 + (+b.getAttribute("data-i"));
+        if (pat < psp.order.length) { psp.order.splice(psp.pos + 1, 0, psp.order.splice(pat, 1)[0]); spNext(); } break;
+      case "sp-skip":
+        var ksp = curSt().sp, kat = ksp.pos + 1 + (+b.getAttribute("data-i"));
+        if (kat < ksp.order.length) {
+          var kid = ksp.order.splice(kat, 1)[0];
+          if (ksp.order.length - (ksp.pos + 1) >= 3) { ksp.order.push(kid); PC.toast("Skipped: sent to the bottom of the pile."); } else PC.toast("Skipped.");
+          saveSoon(); renderResultsArea();
+        } break;
+      case "sp-skipcur":
+        if (!(await PC.confirm("Skip this case?", "It goes to the bottom of the pile, and spots already placed on it are cleared.", "Skip it"))) break;
+        var cst = curSt(), csp = cst.sp, cq = curQ(), cid = csp.order[csp.pos], CA = live.s.answers[cq.id] || {};
+        Object.keys(CA).forEach(function (pp) { if (CA[pp] && CA[pp][cid]) delete CA[pp][cid]; });
+        csp.order.splice(csp.pos, 1); if (csp.order.length - csp.pos >= 3) csp.order.push(cid);
+        if (csp.pos >= csp.order.length) { csp.pos = Math.max(0, csp.order.length - 1); spLodge(); break; }
+        csp.phase = "place"; startVoting(cst, cq); sendState(true); saveSoon(); renderStage(); break;
+      case "sp-lodge":
+        var lsp = curSt().sp;
+        if (lsp.phase === "place" && !(await PC.confirm("Hit the Lodge?", "The case on the lift right now won’t go on the map. You can keep riding afterward.", "Hit the Lodge"))) break;
+        spLodge(); break;
+      case "sp-ride":
+        var est = curSt(), esp = est.sp;
+        esp.phase = esp.prev === "place" ? "place" : "revealed"; if (esp.phase === "place") startVoting(est, curQ());
+        sendState(true); saveSoon(); renderStage(); break;
       case "reveal": var sr = curSt(); sr.revealed = !sr.revealed; if (sr.revealed) { sr.open = false; sr.endsAt = null; sr.hideResults = false; } sendState(true); saveSoon(); renderStage(); break;
       case "people": drawer("People", peopleBody()); break;
       case "moderate": drawer("Moderation", modBody()); break;

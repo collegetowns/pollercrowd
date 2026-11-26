@@ -32,6 +32,10 @@
       if (q.type === "rk") r.rows.forEach(function (x, j) { rows.push([n, T, q.prompt, x.label, x.points, "", "Overall place " + (j + 1) + "; average place " + (r.total ? x.avg.toFixed(2) : "–")]); });
       if (q.type === "wc") r.words.forEach(function (w) { rows.push([n, T, q.prompt, w.text, w.count, "", ""]); });
       if (q.type === "qa") r.items.forEach(function (x) { rows.push([n, T, q.prompt, x.text, x.votes, "", x.answered ? "Answered" : ""]); });
+      if (q.type === "sp") r.items.forEach(function (x) {
+        rows.push([n, T, q.prompt, x.n + ". " + x.title, x.marks.length, people(s) ? Math.round(x.marks.length / people(s) * 100) + "%" : "",
+          window.PCSlopes.levelOf(q, x.y) + " · " + window.PCSlopes.leanOf(q, x.x) + " · " + x.agree + " · left–right " + Math.round(x.x * 100) + " (0 = " + q.lowLabel + ", 100 = " + q.highLabel + "), top–bottom " + Math.round(x.y * 100) + " (0 = top)"]);
+      });
       if ((r.rows && !r.rows.length) || (r.words && !r.words.length) || (r.items && !r.items.length)) rows.push([n, T, q.prompt, "(no responses)", "", "", ""]);
     });
     var lb = R.leaderboard(s, 0);
@@ -146,6 +150,22 @@
       }
       if (q.type === "sl") {
         if (q.body) sl.addText(q.body, { x: area.x, y: area.y, w: area.w, h: 4.4, fontFace: BODY, fontSize: 24, color: C.ink, valign: "top", fit: "shrink" });
+        continue;
+      }
+      if (q.type === "sp" && r.items.length) {
+        var SPX = window.PCSlopes, pal = day ? "day" : "night", mw = Math.min(area.w * 0.64, area.h * 1000 / 640), mh = mw * 640 / 1000;
+        var mapAvg = await SPX.png(q, r.items, pal, "avg");
+        if (mapAvg) sl.addImage({ data: mapAvg, x: area.x, y: area.y, w: mw, h: mh, altText: "Crowd average for each case" });
+        var lx = area.x + mw + 0.3, lw = area.x + area.w - lx;
+        sl.addText(r.items.slice(0, 16).map(function (x) { return { text: x.n + ". " + x.label + "\n", options: { breakLine: false } }; }), { x: lx, y: area.y, w: lw, h: area.h, fontFace: BODY, fontSize: r.items.length > 10 ? 12 : 15, color: C.ink, valign: "top", fit: "shrink" });
+        if (r.items.length > 16) sl.addText("+ " + (r.items.length - 16) + " more in the spreadsheet export", { x: lx, y: 6.55, w: lw, h: 0.35, fontFace: BODY, fontSize: 11, color: C.muted });
+        var mapInd = await SPX.png(q, r.items, pal, "orig");
+        if (mapInd) {
+          var ind = base("Question " + (i + 1) + " · Slopes · Individual Run");
+          ind.addText(q.prompt, { x: 0.6, y: 0.75, w: 12.1, h: 0.9, fontFace: H, fontSize: 26, bold: true, color: C.ink, valign: "top", fit: "shrink" });
+          var iw = Math.min(12.1, 5.0 * 1000 / 640);
+          ind.addImage({ data: mapInd, x: 0.6 + (12.1 - iw) / 2, y: 1.75, w: iw, h: iw * 640 / 1000, altText: "Each person's spot for each case" });
+        }
         continue;
       }
       if (!r.total) { sl.addText("No responses", { x: area.x, y: 3.6, w: area.w, h: 0.8, fontFace: H, fontSize: 28, color: C.muted, align: "center" }); continue; }

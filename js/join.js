@@ -175,6 +175,7 @@
     var q = state.q, h = "";
     var mine = room.ans[q.id];
     if (q.type === "sl") return slideScreen(q);
+    if (q.type === "sp") return slopesScreen(q);
     h += '<div class="stack-16" style="gap:6px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="label">Question ' + (q.i + 1) + " of " + q.n + '</span><span class="timer" id="timer"></span></div>' +
       '<h1 style="font-size:27px">' + esc(q.prompt) + "</h1>" + (q.photo ? '<p class="note" style="font-weight:700">Look up: there’s a photo on the big screen.</p>' : "") + "</div>";
     var closed = !q.open;
@@ -238,6 +239,29 @@
     }
     return h;
   }
+  /* ---------- Slopes: tap the map, lock in ---------- */
+  var SP = window.PCSlopes;
+  function myBuddy() {
+    var r = state && state.roster && state.roster[me];
+    if (r) { var c = r.split("."); return { k: c[0], v: +c[1], l: c[2] }; }
+    return room.b ? { k: room.b.k, v: room.b.v, l: room.b.l } : null;
+  }
+  function mySpots(q) { var a = room.ans[q.id]; return a && typeof a === "object" && !Array.isArray(a) ? a : {}; }
+  function slopesScreen(q) {
+    var sp = q.sp || {}, bud = myBuddy(), big = function (n) { return bud ? B.svg(bud.k, bud.v, bud.l, n) : ""; };
+    if (sp.phase === "lodge") return '<div class="wait-card">' + PC.igloo(180) + '<h1 style="font-size:28px">Back at the lodge</h1><p class="muted">That’s the end of this run. Thanks for riding! Eyes on the big screen.</p></div>';
+    if (sp.phase !== "place" || sp.i == null) return '<div class="wait-card">' + big(130) + '<h1 style="font-size:30px">Eyes up!</h1><p class="muted">The crowd average is on the big screen. The next case is coming soon.</p></div>';
+    var key = q.id + "_" + sp.i, mine = mySpots(q), axes = { lowLabel: sp.low, highLabel: sp.high, levels: sp.lv };
+    var head = '<div class="stack-16" style="gap:6px"><span class="label">On the lift · Case ' + sp.n + '</span><h1 style="font-size:28px">' + esc(sp.title) + '</h1><p class="muted" style="font-weight:700;margin:0">' + esc(q.prompt) + "</p></div>";
+    if (mine[sp.i] && !drafts["spc" + key]) return head + '<div class="wait-card">' + big(120) + '<h2 style="font-size:30px">Locked in. Eyes up!</h2><p class="muted">Your spot stays hidden until the presenter reveals the crowd average.</p>' +
+      (q.open ? '<button type="button" class="btn" data-act="sp-change">Change my spot</button>' : "") + "</div>";
+    if (!q.open) return head + '<div class="sent" style="color:var(--muted)">Answers are closed.</div>';
+    var spot = drafts["sp" + key] || null;
+    return head + '<div class="sp-phone">' + SP.phoneSvg(axes, spot, bud) + "</div>" +
+      '<p class="note" style="text-align:center;font-weight:700;margin:0">' + (spot ? "Your spot: " + esc(SP.levelOf(axes, spot[1] / 1000)) + ", " + esc(SP.leanOf(axes, spot[0] / 1000).toLowerCase()) + ". Lock it in, or tap again to move it." : "Tap the map where this case belongs.") + "</p>" +
+      '<div class="sp-btns"><button type="button" class="btn primary big" data-act="sp-lock"' + (spot ? "" : " disabled") + '>✓ Lock in</button><button type="button" class="btn big" data-act="sp-rerun"' + (spot ? "" : " disabled") + ">↺ Re-run</button></div>";
+  }
+
   function leanWords(q, v) {
     if (v <= 10) return "All the way to " + (q.lowLabel || "cold");
     if (v < 40) return "Closer to " + (q.lowLabel || "cold");
@@ -343,6 +367,12 @@
     send({ t: "ans", q: q.id, v: value });
   }
   app.addEventListener("click", function (e) {
+    var map = e.target.closest && e.target.closest("#spMap"), sq = state && state.q;
+    if (map && sq && sq.type === "sp" && sq.sp && sq.sp.i != null && sq.open) {
+      var pt = SP.phoneSpot(map, e.clientX, e.clientY);
+      if (pt) { drafts["sp" + sq.id + "_" + sq.sp.i] = pt; render(); }
+      return;
+    }
     var b = e.target.closest("button"); if (!b || b.disabled) return;
     var q = state && state.q;
     if (b.hasAttribute("data-kind")) { picking.k = b.getAttribute("data-kind"); picking.l = "none"; picking.v = null; render(); return; }
@@ -363,6 +393,18 @@
       if (q.multi) { var d = (drafts["m" + q.id] || (Array.isArray(room.ans[q.id]) ? room.ans[q.id].slice() : [])); var at = d.indexOf(i); if (at >= 0) d.splice(at, 1); else d.push(i); d.sort(); drafts["m" + q.id] = d; render(); }
       else answer(i);
       return;
+    }
+    if (q.type === "sp" && q.sp && q.sp.i != null) {
+      var k2 = q.id + "_" + q.sp.i;
+      if (act === "sp-rerun") { delete drafts["sp" + k2]; render(); return; }
+      if (act === "sp-change") { drafts["spc" + k2] = true; drafts["sp" + k2] = mySpots(q)[q.sp.i] || null; render(); return; }
+      if (act === "sp-lock") {
+        var pt2 = drafts["sp" + k2]; if (!pt2) return;
+        var spots = mySpots(q); spots[q.sp.i] = pt2; room.ans[q.id] = spots; saveRoom();
+        delete drafts["spc" + k2]; render();
+        send({ t: "ans", q: q.id, v: { i: q.sp.i, x: pt2[0], y: pt2[1] } });
+        return;
+      }
     }
     if (act === "send-multi") { answer((drafts["m" + q.id] || []).slice()); return; }
     if (b.hasAttribute("data-rate")) { answer(+b.getAttribute("data-rate")); return; }

@@ -11,6 +11,7 @@
     qz: { name: "Quiz race", hint: "Competition: speed scores points", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 2.5h5M12 6V2.5M18.5 6.5l1.5-1.5"/></svg>' },
     rk: { name: "Ranking", hint: "Put items in order", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6h10M10 12h7M10 18h4"/><path d="M4.5 4.5l1-.8v4.3M3.8 11.2a1.1 1.1 0 1 1 1.9.8L3.8 14.4h2.2M3.8 16.6h2.1l-1.1 1.3a1.15 1.15 0 1 1-1.1 1.6"/></svg>' },
     th: { name: "Thermometer", hint: "Slide between two poles", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13.6V5a2 2 0 1 1 4 0v8.6a4 4 0 1 1-4 0z"/><path d="M12 9v8"/><path d="M17.5 5h2.5M17.5 9h2.5"/></svg>' },
+    sp: { name: "Slopes", hint: "Place cases on a 2-way map", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 20l6.5-11 4 6 2.5-4 6 9z"/><path d="M9 9l-1.6 2.7M15.5 11l1.2 2"/><path d="M4 22h16"/></svg>' },
     sl: { name: "Info slide", hint: "Title, notes or a break", glyph: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 8.5h10M7 12h6M12 16v4M8.5 20h7"/></svg>' }
   };
   var LETTERS = "ABCDEFGH";
@@ -30,6 +31,7 @@
     if (type === "qa") { q.moderate = false; }
     if (type === "rs") { q.scaleMax = 5; q.lowLabel = "Not at all"; q.highLabel = "Very much"; }
     if (type === "th") { q.lowLabel = ""; q.highLabel = ""; }
+    if (type === "sp") { q.prompt = ""; q.lowLabel = ""; q.highLabel = ""; q.levels = ["", "", ""]; q.items = []; q.shuffle = true; }
     if (type === "sl") { q.body = ""; q.timer = 0; }
     return q;
   }
@@ -37,7 +39,8 @@
   function convert(q, type) {
     var n = blank(type); n.id = q.id; n.prompt = q.prompt;
     if (q.image) { n.image = q.image; n.imageAlt = q.imageAlt; }
-    if (n.lowLabel != null && (q.type === "rs" || q.type === "th")) { n.lowLabel = q.lowLabel; n.highLabel = q.highLabel; }
+    if (n.lowLabel != null && (q.type === "rs" || q.type === "th" || q.type === "sp")) { n.lowLabel = q.lowLabel; n.highLabel = q.highLabel; }
+    if (type === "sp" && (q.type === "mc" || q.type === "rk") && q.options) n.items = q.options.filter(function (o) { return String(o || "").trim(); });
     if (type === "sl" && q.body) n.body = q.body;
     if (n.options && q.options) n.options = q.options.slice(0, 8).concat(n.options.slice(q.options.length)).slice(0, Math.max(q.options.length, type === "rk" ? 3 : 2));
     if (type === "mc" || type === "qz") {
@@ -51,6 +54,12 @@
     var p = [];
     if (!String(q.prompt || "").trim()) p.push(q.type === "sl" ? "Add a title." : "Add the question text.");
     if (q.type === "th" && (!String(q.lowLabel || "").trim() || !String(q.highLabel || "").trim())) p.push("Name both poles.");
+    if (q.type === "sp") {
+      var SP = window.PCSlopes;
+      if (!String(q.lowLabel || "").trim() || !String(q.highLabel || "").trim()) p.push("Name both ends of the left–right line.");
+      if (SP.levels(q).length < 2) p.push("Name at least two levels (top to bottom).");
+      if (!SP.items(q).length) p.push("Add at least one case to place.");
+    }
     if (q.type === "mc" || q.type === "qz") { if (cleanOptions(q).length < 2) p.push("Add at least two answers."); }
     if (q.type === "rk" && cleanOptions(q).length < 2) p.push("Add at least two items to rank.");
     if (q.type === "qz" && !corrects(q).filter(function (i) { return String((q.options || [])[i] || "").trim(); }).length) p.push("Mark at least one correct answer.");
@@ -91,6 +100,7 @@
       r.low = vals.length ? vals[Math.floor((vals.length - 1) * 0.25)] : 0; r.high = vals.length ? vals[Math.ceil((vals.length - 1) * 0.75)] : 0;
     }
     if (q.type === "sl") r.total = 0;
+    if (q.type === "sp") return window.PCSlopes.compute(session, q);
     if (q.type === "rk") {
       var k = opts.length, pos = opts.map(function () { return 0; }), pts = opts.map(function () { return 0; });
       who.forEach(function (p) {
@@ -152,6 +162,7 @@
   }
   function view(session, q, opts) {
     opts = opts || {};
+    if (q.type === "sp") return window.PCSlopes.view(session, q);
     var r = compute(session, q), h = "";
     var st = (session.status || {})[q.id] || {};
     var reveal = opts.reveal != null ? opts.reveal : st.revealed;

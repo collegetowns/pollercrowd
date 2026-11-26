@@ -2,7 +2,7 @@
 
 **Warm up the lecture.** Free live polls, word clouds, quizzes, rankings and Q&A for classes, lectures, workshops and conference talks. The audience scans a QR code and answers from their phones: no app, no accounts, anonymous answers. A free app from [College Towns](https://www.collegetowns.org).
 
-- **Seven activities, plus info slides:** multiple choice, word cloud, rating scale, open Q&A with upvotes, timed quiz race with a leaderboard, ranking, and thermometer (people place something between two poles). Info slides show a title, notes or a break countdown with nothing to answer.
+- **Eight activities, plus info slides:** multiple choice, word cloud, rating scale, open Q&A with upvotes, timed quiz race with a leaderboard, ranking, thermometer (people place something between two poles), and Slopes (cases come up one at a time and everyone places each on a two-way map, like precision–flexibility by federal/state/local; the big screen reveals the crowd average and builds the map case by case). Info slides show a title, notes or a break countdown with nothing to answer.
 - **Buddies:** participants pick one of 10 polar buddies with 4 color patterns and 5 looks (200 combinations). Repeats are avoided automatically.
 - **Polar Night and Polar Day** themes on every screen.
 - **Rude-word filter:** common swear words and slurs become `#!*&`. Presenters can also hold answers for approval, hide anything, and remove someone.

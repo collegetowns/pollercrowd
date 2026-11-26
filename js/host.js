@@ -98,12 +98,8 @@
   }
   if (!PC.store.get("sampleRace")) { Store.saveDeck(sampleRace()); PC.store.set("sampleRace", true); }
   function sampleSlopes() {
-    var policies = ["Curriculum in elementary and middle school | Elem. & middle curriculum", "Curriculum in high school | High school curriculum", "Curriculum in universities | University curriculum",
-      "How much teachers are paid | Teacher pay", "Discrimination/ protected classes (race, gender, etc.) | Protected classes", "Driver’s license rules", "Highway speeds", "Speeds on local streets | Local street speeds",
-      "Obscenity speech codes", "Building codes (such as fire safety and disability accommodations) | Building codes", "Building zoning codes | Zoning codes", "Workplace safety codes",
-      "International Diplomacy | International diplomacy", "Privacy laws", "Artificial Intelligence | Artificial intelligence", "Police conduct", "Rights for those arrested/ prisoners | Arrestee & prisoner rights",
-      "Immigration rules", "Income taxes", "Corporate taxes", "Health insurance regulations | Health insurance regs", "Car insurance regulations | Car insurance regs", "Border Control | Border control",
-      "Responses to homelessness | Homelessness responses", "Drug and alcohol regulations | Drug & alcohol regs", "Voter rights", "Voting age", "Election management", "Hair stylist licensure", "Teacher licensure", "Environmental protection"];
+    // A short starter list; paste in a longer one in the editor
+    var policies = ["Border Control | Border control", "Income taxes", "Teacher licensure", "Building zoning codes | Zoning codes", "Speeds on local streets | Local street speeds"];
     return {
       id: PC.uid(8), title: "Sample: Policy Slopes", updated: Date.now() + 2, questions: [
         Object.assign(R.blank("sl"), { prompt: "Welcome to Policy Slopes!", body: "Scan the code and pick your buddy.\nFor each policy: who usually sets it, and how much room does it leave?" }),
@@ -112,6 +108,14 @@
     };
   }
   if (!PC.store.get("sampleSlopes")) { Store.saveDeck(sampleSlopes()); PC.store.set("sampleSlopes", true); }
+  // The first version of the sample had all 31 policies; trim an untouched copy down to the short list
+  if (!PC.store.get("sampleSlopes5")) {
+    Store.decks().filter(function (d) { return d.title === "Sample: Policy Slopes"; }).forEach(function (d) {
+      var x = Store.deck(d.id), sq = x && x.questions.filter(function (q) { return q.type === "sp"; })[0];
+      if (sq && (sq.items || []).length === 31) { sq.items = sampleSlopes().questions[1].items; Store.saveDeck(x); }
+    });
+    PC.store.set("sampleSlopes5", true);
+  }
   // Give the sample set a photo so every feature is there to try
   if (!PC.store.get("samplePhoto")) {
     var sd = Store.decks().filter(function (d) { return d.title === "Sample: Earth Science 101"; })[0], sdeck = sd && Store.deck(sd.id);
